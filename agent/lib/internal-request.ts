@@ -10,7 +10,12 @@ const eveDevServerSchema = z.object({
 });
 
 export async function postInternalRoute(path: string, serializedBody: string) {
-  const token = env.VERCEL_ENV ? await getVercelOidcToken() : undefined;
+  // Workflow invocations can carry a production-scoped request token even
+  // while executing a preview deployment. Prefer the deployment's own token
+  // so Vercel Trusted Sources sees the target's matching environment.
+  const token = env.VERCEL_ENV
+    ? (env.VERCEL_OIDC_TOKEN ?? (await getVercelOidcToken()))
+    : undefined;
   const headers = new Headers({ "content-type": "application/json" });
   if (token) {
     headers.set("authorization", `Bearer ${token}`);

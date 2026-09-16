@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 interface TestEnvironment {
   NODE_ENV: "development" | "production" | "test";
   VERCEL_ENV: "development" | "preview" | "production" | undefined;
+  VERCEL_OIDC_TOKEN: string | undefined;
   VERCEL_URL: string | undefined;
 }
 
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => {
   const env: TestEnvironment = {
     NODE_ENV: "development",
     VERCEL_ENV: undefined,
+    VERCEL_OIDC_TOKEN: undefined,
     VERCEL_URL: undefined,
   };
   return {
@@ -36,6 +38,7 @@ describe("scheduled run requests", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null)));
     mocks.env.NODE_ENV = "development";
     mocks.env.VERCEL_ENV = undefined;
+    mocks.env.VERCEL_OIDC_TOKEN = undefined;
     mocks.env.VERCEL_URL = undefined;
     mocks.getToken.mockResolvedValue("vercel-oidc-token");
     mocks.readFile.mockResolvedValue(
@@ -73,6 +76,24 @@ describe("scheduled run requests", () => {
     expect(sentHeaders().get("content-type")).toBe("application/json");
     expect(sentHeaders().get("x-vercel-trusted-oidc-idp-token")).toBe(
       "vercel-oidc-token"
+    );
+  });
+
+  it("prefers the deployment token over a workflow request token", async () => {
+    mocks.env.VERCEL_ENV = "preview";
+    mocks.env.VERCEL_OIDC_TOKEN = "preview-deployment-token";
+    mocks.env.VERCEL_URL = "openinstinct-preview.vercel.app";
+
+    await postScheduledRunRoute("/internal/scheduled-run/report", {
+      runId: "run-1",
+    });
+
+    expect(mocks.getToken).not.toHaveBeenCalled();
+    expect(sentHeaders().get("authorization")).toBe(
+      "Bearer preview-deployment-token"
+    );
+    expect(sentHeaders().get("x-vercel-trusted-oidc-idp-token")).toBe(
+      "preview-deployment-token"
     );
   });
 
