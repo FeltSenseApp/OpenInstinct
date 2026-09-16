@@ -80,7 +80,7 @@ describe("company dispatch", () => {
 
     const [url, request] = vi.mocked(fetch).mock.calls[0] ?? [];
     expect(url).toEqual(
-      new URL("https://example.com/internal/company-run/start")
+      new URL("https://example.com/eve/v1/company-run/start")
     );
     expect(request).toMatchObject({ method: "POST" });
     const serializedBody = z.string().parse(request?.body);
@@ -123,7 +123,7 @@ describe("company dispatch", () => {
     );
     const [url, request] = vi.mocked(fetch).mock.calls[0] ?? [];
     expect(url).toEqual(
-      new URL("https://example.com/internal/company-run/respond")
+      new URL("https://example.com/eve/v1/company-run/respond")
     );
     const serializedBody = z.string().parse(request?.body);
     expect(companyRunRespondSchema.parse(JSON.parse(serializedBody))).toEqual({

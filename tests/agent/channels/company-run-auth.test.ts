@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import companyRunChannel from "@agent/channels/company-run";
 
 const paths = [
-  "/internal/company-run/start",
-  "/internal/company-run/report",
-  "/internal/company-run/respond",
+  "/eve/v1/company-run/start",
+  "/eve/v1/company-run/report",
+  "/eve/v1/company-run/respond",
 ] as const;
 
 describe("company run channel authentication", () => {

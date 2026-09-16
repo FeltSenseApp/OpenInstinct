@@ -14,7 +14,7 @@ export default defineChannel({
     return auth?.principalType === "user" ? "private" : "unknown";
   },
   routes: [
-    POST("/internal/company-run/start", async (request, { from }) => {
+    POST("/eve/v1/company-run/start", async (request, { from }) => {
       const auth = await routeAuth(request, internalRouteAuth);
       if (auth instanceof Response) return auth;
       const input = companyRunStartSchema.parse(await request.json());
@@ -31,7 +31,7 @@ export default defineChannel({
       );
     }),
     POST(
-      "/internal/company-run/report",
+      "/eve/v1/company-run/report",
       async (request, { attachSession, to }) => {
         const auth = await routeAuth(request, internalRouteAuth);
         if (auth instanceof Response) return auth;
@@ -58,7 +58,7 @@ export default defineChannel({
       }
     ),
     POST(
-      "/internal/company-run/respond",
+      "/eve/v1/company-run/respond",
       async (request, { attachSession }) => {
         const auth = await routeAuth(request, internalRouteAuth);
         if (auth instanceof Response) return auth;

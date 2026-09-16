@@ -49,7 +49,7 @@ export async function postCompanyRunStart(
   body: z.infer<typeof companyRunStartSchema>
 ) {
   return postInternalRoute(
-    "/internal/company-run/start",
+    "/eve/v1/company-run/start",
     JSON.stringify(companyRunStartSchema.parse(body))
   );
 }
@@ -58,7 +58,7 @@ export async function postCompanyRunReport(
   body: z.infer<typeof companyRunReportSchema>
 ) {
   return postInternalRoute(
-    "/internal/company-run/report",
+    "/eve/v1/company-run/report",
     JSON.stringify(companyRunReportSchema.parse(body))
   );
 }
@@ -67,7 +67,7 @@ export async function postCompanyRunResponse(
   body: z.infer<typeof companyRunRespondSchema>
 ) {
   return postInternalRoute(
-    "/internal/company-run/respond",
+    "/eve/v1/company-run/respond",
     JSON.stringify(companyRunRespondSchema.parse(body))
   );
 }
