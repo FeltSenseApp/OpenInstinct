@@ -52,5 +52,6 @@ async function seedStructuredProfileWhenSupported() {
     phone: "+12025550100",
     postalCode: "11201",
     region: "NY",
+    timezone: "America/New_York",
   });
 }

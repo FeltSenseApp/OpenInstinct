@@ -22,6 +22,7 @@ const selection = {
   phone: userProfiles.phone,
   postalCode: userProfiles.postalCode,
   region: userProfiles.region,
+  timezone: userProfiles.timezone,
 };
 
 export async function readUserProfile(scope: AccessScope) {
