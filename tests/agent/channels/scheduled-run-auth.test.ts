@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import scheduledRunChannel from "@agent/channels/scheduled-run";
 
 const scheduledRunPaths = [
+  "/internal/scheduled-run/dispatch",
   "/internal/scheduled-run/report",
   "/internal/scheduled-run/respond",
 ] as const;

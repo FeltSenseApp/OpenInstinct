@@ -10,6 +10,7 @@ const eveDevServerSchema = z.object({
 });
 
 interface ScheduledRunRequestBodies {
+  "/internal/scheduled-run/dispatch": Record<string, never>;
   "/internal/scheduled-run/report": { runId: string };
   "/internal/scheduled-run/respond": {
     answer: string;

@@ -13,6 +13,7 @@ import { scheduleTimingSchema } from "@shared/schedules/timing";
 import {
   createScheduledAgentJob,
   getScheduledAgentRunInput,
+  getScheduledAgentRunInputForConversation,
   getScheduledAgentRunInputForReport,
   listScheduledAgentJobs,
   updateScheduledAgentJob,
@@ -132,7 +133,19 @@ async function pendingScheduledRun(context: ToolContext, runId: string) {
   const resolvePending = resolveModeValue(context, {
     interactive: () => {
       const owner = scheduleOwner(context);
-      return getScheduledAgentRunInput(owner.scope, owner.conversation, runId);
+      return getScheduledAgentRunInput(
+        owner.scope,
+        owner.conversation,
+        runId
+      ).then(
+        (pending) =>
+          pending ??
+          getScheduledAgentRunInputForConversation(
+            owner.scope.userId,
+            owner.conversation,
+            runId
+          )
+      );
     },
     "scheduled-report": () => {
       const report = scheduledReportIdentity(context.session.auth);
