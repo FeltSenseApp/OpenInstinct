@@ -96,7 +96,6 @@ export const env = createEnv({
       .default("production"),
     VERCEL_BRANCH_URL: requiredValue.optional(),
     VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
-    VERCEL_OIDC_TOKEN: requiredValue.optional(),
     VERCEL_PROJECT_ID: requiredValue.optional(),
     VERCEL_PROJECT_PRODUCTION_URL: requiredValue.optional(),
     VERCEL_URL: requiredValue.optional(),
