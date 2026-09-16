@@ -42,22 +42,19 @@ export default defineChannel({
   routes: [
     POST(
       "/internal/scheduled-run/dispatch",
-      async (request, { from, to, waitUntil }) => {
+      async (request, { from, to }) => {
         const auth = await routeAuth(request, internalRouteAuth);
         if (auth instanceof Response) return auth;
-        waitUntil(
-          new Promise((resolve) => setTimeout(resolve, 300)).then(() =>
-            dispatchDueWork(to, async (target, message, options) => {
-              const source = from(`scheduled-run:${target.runId}`);
-              if (target.restart) {
-                await source.reset({
-                  reason: "Scheduled worker exceeded its runtime.",
-                });
-              }
-              return source.send(message, options);
-            })
-          )
-        );
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        await dispatchDueWork(to, async (target, message, options) => {
+          const source = from(`scheduled-run:${target.runId}`);
+          if (target.restart) {
+            await source.reset({
+              reason: "Scheduled worker exceeded its runtime.",
+            });
+          }
+          return source.send(message, options);
+        });
         return new Response(null, { status: 202 });
       }
     ),
