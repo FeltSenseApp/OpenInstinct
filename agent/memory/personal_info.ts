@@ -86,6 +86,7 @@ export default defineMemory({
   scope(context) {
     const scope = resolvePersonalInfoAccessScope(context)?.workspaceId ?? null;
     return resolveModeValue(context, {
+      "company-worker": scope,
       interactive: scope,
       "scheduled-worker": scope,
     });

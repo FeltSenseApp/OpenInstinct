@@ -266,27 +266,6 @@ describe("scheduled agent jobs", () => {
     ).toMatchObject({
       leaseToken: claim.run.leaseToken,
     });
-    expect(
-      await jobs.getScheduledAgentRunInputForConversation(
-        bob.userId,
-        aliceConversation,
-        claim.run.id
-      )
-    ).toBeUndefined();
-    expect(
-      await jobs.getScheduledAgentRunInputForConversation(
-        alice.userId,
-        bobConversation,
-        claim.run.id
-      )
-    ).toBeUndefined();
-    expect(
-      await jobs.getScheduledAgentRunInputForConversation(
-        alice.userId,
-        aliceConversation,
-        claim.run.id
-      )
-    ).toMatchObject({ leaseToken: claim.run.leaseToken });
     const resumed = await jobs.claimScheduledAgentRunInput(
       claim.run.id,
       claim.run.leaseToken,

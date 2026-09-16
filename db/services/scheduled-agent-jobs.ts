@@ -456,36 +456,6 @@ export async function getScheduledAgentRunInput(
   };
 }
 
-export async function getScheduledAgentRunInputForConversation(
-  userId: string,
-  conversation: Pick<
-    CreateScheduledAgentJob,
-    "conversationChannel" | "conversationId"
-  >,
-  runId: string
-) {
-  const pending = await db.query.scheduledAgentRuns.findFirst({
-    where: and(
-      eq(scheduledAgentRuns.id, runId),
-      eq(scheduledAgentRuns.status, "waiting_for_input"),
-      eq(scheduledAgentRuns.reportStatus, "delivered")
-    ),
-    with: { job: true },
-  });
-  if (
-    !pending ||
-    pending.job.createdByUserId !== userId ||
-    pending.job.conversationChannel !== conversation.conversationChannel ||
-    pending.job.conversationId !== conversation.conversationId ||
-    !pending.leaseToken ||
-    !pending.pendingInputRequests ||
-    !pending.workerSessionId
-  ) {
-    return undefined;
-  }
-  return { leaseToken: pending.leaseToken, runId: pending.id };
-}
-
 export async function getScheduledAgentRunInputForReport(
   runId: string,
   reportLeaseToken: string

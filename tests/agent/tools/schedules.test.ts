@@ -8,7 +8,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   createScheduledAgentJob,
   getScheduledAgentRunInput,
-  getScheduledAgentRunInputForConversation,
   getScheduledAgentRunInputForReport,
   listScheduledAgentJobs,
   updateScheduledAgentJob,
@@ -17,8 +16,6 @@ import type {
 const services = vi.hoisted(() => ({
   create: vi.fn<typeof createScheduledAgentJob>(),
   getInput: vi.fn<typeof getScheduledAgentRunInput>(),
-  getInputForConversation:
-    vi.fn<typeof getScheduledAgentRunInputForConversation>(),
   getInputForReport: vi.fn<typeof getScheduledAgentRunInputForReport>(),
   list: vi.fn<typeof listScheduledAgentJobs>(),
   update: vi.fn<typeof updateScheduledAgentJob>(),
@@ -27,7 +24,6 @@ const services = vi.hoisted(() => ({
 vi.mock("@db/services/scheduled-agent-jobs", () => ({
   createScheduledAgentJob: services.create,
   getScheduledAgentRunInput: services.getInput,
-  getScheduledAgentRunInputForConversation: services.getInputForConversation,
   getScheduledAgentRunInputForReport: services.getInputForReport,
   listScheduledAgentJobs: services.list,
   updateScheduledAgentJob: services.update,
@@ -123,40 +119,6 @@ describe("schedule tools", () => {
       )
     ).rejects.toThrow("This reporting turn cannot resume that run.");
     expect(services.getInput).toHaveBeenCalledOnce();
-  });
-
-  it("resumes a company run from its originating personal conversation", async () => {
-    const resolve = schedules.events["turn.started"];
-    if (!resolve) throw new Error("Expected the schedules resolver.");
-    const interactiveTools = await resolve({}, dynamicContext("linq"));
-    const answer =
-      interactiveTools && !("execute" in interactiveTools)
-        ? interactiveTools["schedules-answer"]
-        : null;
-    if (!answer) throw new Error("Expected the schedules-answer tool.");
-
-    services.getInput.mockResolvedValue(undefined);
-    services.getInputForConversation.mockResolvedValue({
-      leaseToken: "00000000-0000-4000-8000-000000000003",
-      runId: "00000000-0000-4000-8000-000000000002",
-    });
-    await answer.execute(
-      {
-        answer: "Approve it.",
-        runId: "00000000-0000-4000-8000-000000000002",
-      },
-      toolContext("schedules-answer", "linq")
-    );
-
-    expect(services.getInputForConversation).toHaveBeenCalledExactlyOnceWith(
-      "user-1",
-      { conversationChannel: "linq", conversationId: "linq:dm:chat-1" },
-      "00000000-0000-4000-8000-000000000002"
-    );
-    expect(fetch).toHaveBeenCalledWith(
-      new URL("https://example.com/internal/scheduled-run/respond"),
-      expect.objectContaining({ method: "POST" })
-    );
   });
 
   it("creates a schedule without a multiplexed action field", async () => {

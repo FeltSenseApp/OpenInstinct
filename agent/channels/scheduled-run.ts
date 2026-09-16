@@ -2,7 +2,6 @@ import { defineChannel, POST } from "eve/channels";
 import { localDev, routeAuth, vercelOidc } from "eve/channels/auth";
 import { parseInputResponses, resolveTextToResponses } from "eve/client";
 import { z } from "zod";
-import { dispatchDueWork } from "@agent/lib/schedules/dispatch";
 import { dispatchScheduledReport } from "@agent/lib/schedules/report";
 import {
   claimScheduledAgentRunInput,
@@ -40,24 +39,6 @@ export default defineChannel({
     });
   },
   routes: [
-    POST(
-      "/internal/scheduled-run/dispatch",
-      async (request, { from, to }) => {
-        const auth = await routeAuth(request, internalRouteAuth);
-        if (auth instanceof Response) return auth;
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        await dispatchDueWork(to, async (target, message, options) => {
-          const source = from(`scheduled-run:${target.runId}`);
-          if (target.restart) {
-            await source.reset({
-              reason: "Scheduled worker exceeded its runtime.",
-            });
-          }
-          return source.send(message, options);
-        });
-        return new Response(null, { status: 202 });
-      }
-    ),
     POST(
       "/internal/scheduled-run/report",
       async (request, { attachSession, to, waitUntil }) => {

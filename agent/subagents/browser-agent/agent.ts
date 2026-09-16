@@ -19,6 +19,7 @@ export default defineDynamic({
         },
       });
       return resolveModeValue(context, {
+        "company-worker": worker,
         interactive: worker,
         "scheduled-worker": worker,
       });

@@ -69,6 +69,10 @@ export default defineDynamic({
   events: {
     "turn.started": (_event, context) =>
       resolveModeValue(context, {
+        "company-worker": {
+          "gmail-read-thread": gmailReadThread,
+          "gmail-search": gmailSearch,
+        },
         interactive: {
           "gmail-read-thread": gmailReadThread,
           "gmail-search": gmailSearch,

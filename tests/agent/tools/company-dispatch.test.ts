@@ -1,15 +1,20 @@
 import type { DynamicResolveContext, ToolContext } from "eve/tools";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { createScheduledAgentJob } from "@db/services/scheduled-agent-jobs";
+import { z } from "zod";
+import type { findCompanySessionForUser } from "@db/services/sessions";
 import type { listWorkspacesForUser } from "@db/services/workspaces";
+import {
+  companyRunRespondSchema,
+  companyRunStartSchema,
+} from "@agent/lib/company-run/request";
 
 const services = vi.hoisted(() => ({
-  create: vi.fn<typeof createScheduledAgentJob>(),
+  findCompanySession: vi.fn<typeof findCompanySessionForUser>(),
   listWorkspaces: vi.fn<typeof listWorkspacesForUser>(),
 }));
 
-vi.mock("@db/services/scheduled-agent-jobs", () => ({
-  createScheduledAgentJob: services.create,
+vi.mock("@db/services/sessions", () => ({
+  findCompanySessionForUser: services.findCompanySession,
 }));
 
 vi.mock("@db/services/workspaces", () => ({
@@ -21,9 +26,6 @@ import companyDispatch from "@agent/tools/company-dispatch";
 describe("company dispatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-09-16T20:00:00.000Z"));
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null)));
     services.listWorkspaces.mockResolvedValue([
       {
         id: "workspace:user-1",
@@ -40,75 +42,108 @@ describe("company dispatch", () => {
     ]);
   });
 
-  it("offers a company tool only in the personal workspace", async () => {
+  it("offers company tools only in the personal workspace", async () => {
     const resolve = companyDispatch.events["turn.started"];
     expect(resolve).toBeDefined();
     if (!resolve) return;
 
     const personal = await resolve({}, dynamicContext("workspace:user-1"));
     expect(personal && !("execute" in personal)).toBe(true);
-    expect(Object.keys(personal ?? {})).toEqual(["company-dispatch"]);
+    expect(Object.keys(personal ?? {})).toEqual([
+      "company-answer",
+      "company-dispatch",
+    ]);
 
     expect(await resolve({}, dynamicContext("company:felt-sense"))).toBeNull();
   });
 
-  it("queues one company-scoped run that reports to the personal conversation", async () => {
-    const resolve = companyDispatch.events["turn.started"];
-    if (!resolve) throw new Error("Expected company dispatch resolver.");
-    const tools = await resolve({}, dynamicContext("workspace:user-1"));
-    const tool =
-      tools && !("execute" in tools) ? tools["company-dispatch"] : null;
+  it("starts a company-owned Eve session without creating a schedule", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            dispatchId: "00000000-0000-4000-8000-000000000001",
+            sessionId: "company-session-1",
+          },
+          { status: 202 }
+        )
+      )
+    );
+    const tools = await resolvedTools();
+    const tool = tools["company-dispatch"];
     if (!tool) throw new Error("Expected company-dispatch tool.");
-    services.create.mockResolvedValue({
-      conversationChannel: "eve",
-      conversationId: "session-personal",
-      createdAt: new Date("2026-09-16T20:00:00.000Z"),
-      createdByUserId: "user-1",
-      id: "00000000-0000-4000-8000-000000000001",
-      lastError: null,
-      lastRunAt: null,
-      missedRunPolicy: "run_latest",
-      nextRunAt: new Date("2026-09-16T20:00:00.250Z"),
-      prompt: "Company dispatch for Felt Sense.",
-      replyAnchorMessageId: null,
-      revision: 0,
-      status: "active",
-      timing: { at: "2026-09-16T20:00:00.250Z", kind: "once" },
-      updatedAt: new Date("2026-09-16T20:00:00.000Z"),
-      workspaceId: "company:felt-sense",
-    });
-
     const result = await tool.execute(
       { company: "Felt Sense", task: "Prepare the launch brief." },
-      toolContext()
+      toolContext("company-dispatch")
     );
 
-    const call = services.create.mock.calls[0];
-    expect(call?.[0]).toEqual({
-      userId: "user-1",
-      workspaceId: "company:felt-sense",
-    });
-    expect(call?.[1]).toMatchObject({
-      conversationChannel: "eve",
-      conversationId: "session-personal",
-      missedRunPolicy: "run_latest",
-      timing: {
-        at: "2026-09-16T20:00:00.250Z",
-        kind: "once",
-      },
-    });
-    expect(call?.[1].prompt).toContain("Task: Prepare the launch brief.");
-    expect(fetch).toHaveBeenCalledWith(
-      new URL("https://example.com/internal/scheduled-run/dispatch"),
-      expect.objectContaining({ method: "POST" })
+    const [url, request] = vi.mocked(fetch).mock.calls[0] ?? [];
+    expect(url).toEqual(
+      new URL("https://example.com/internal/company-run/start")
     );
+    expect(request).toMatchObject({ method: "POST" });
+    const serializedBody = z.string().parse(request?.body);
+    const body = companyRunStartSchema.parse(JSON.parse(serializedBody));
+    expect(body).toMatchObject({
+      companyName: "Felt Sense",
+      originChannel: "eve",
+      originConversationId: "session-personal",
+      originWorkspaceId: "workspace:user-1",
+      targetWorkspaceId: "company:felt-sense",
+      task: "Prepare the launch brief.",
+      userId: "user-1",
+    });
     expect(result).toEqual({
       company: "Felt Sense",
       dispatchId: "00000000-0000-4000-8000-000000000001",
-      status: "queued",
+      sessionId: "company-session-1",
+      status: "started",
+    });
+  });
+
+  it("resumes only a company session owned by the current user", async () => {
+    services.findCompanySession.mockResolvedValue({
+      workspaceId: "company:felt-sense",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 202 }))
+    );
+    const tools = await resolvedTools();
+    const tool = tools["company-answer"];
+    await tool.execute(
+      { answer: "Blue.", sessionId: "company-session-1" },
+      toolContext("company-answer")
+    );
+
+    expect(services.findCompanySession).toHaveBeenCalledWith(
+      "user-1",
+      "company-session-1"
+    );
+    const [url, request] = vi.mocked(fetch).mock.calls[0] ?? [];
+    expect(url).toEqual(
+      new URL("https://example.com/internal/company-run/respond")
+    );
+    const serializedBody = z.string().parse(request?.body);
+    expect(companyRunRespondSchema.parse(JSON.parse(serializedBody))).toEqual({
+      answer: "Blue.",
+      targetWorkspaceId: "company:felt-sense",
+      userId: "user-1",
+      workerSessionId: "company-session-1",
     });
   });
 });
+
+async function resolvedTools() {
+  const resolve = companyDispatch.events["turn.started"];
+  if (!resolve) throw new Error("Expected company dispatch resolver.");
+  const tools = await resolve({}, dynamicContext("workspace:user-1"));
+  if (!tools || "execute" in tools) {
+    throw new Error("Expected company tools.");
+  }
+  return tools;
+}
 
 function dynamicContext(workspaceId: string) {
   return {
@@ -130,7 +165,7 @@ function dynamicContext(workspaceId: string) {
   } satisfies DynamicResolveContext;
 }
 
-function toolContext() {
+function toolContext(toolName: string) {
   return {
     abortSignal: new AbortController().signal,
     callId: "call-company",
@@ -162,6 +197,6 @@ function toolContext() {
       id: "session-personal",
       turn: { id: "turn-1", sequence: 0 },
     },
-    toolName: "company-dispatch",
+    toolName,
   } satisfies ToolContext;
 }

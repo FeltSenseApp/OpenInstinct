@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import type { AccessScope } from "@shared/identity/access-scope";
-import { agentSessions, db } from "@db";
+import { agentSessions, db, workspaces } from "@db";
 
 export async function claimSession(scope: AccessScope, sessionId: string) {
   await db
@@ -41,4 +41,23 @@ export async function isSessionOwned(scope: AccessScope, sessionId: string) {
     )
     .limit(1);
   return rows.length > 0;
+}
+
+export async function findCompanySessionForUser(
+  userId: string,
+  sessionId: string
+) {
+  const [session] = await db
+    .select({ workspaceId: agentSessions.workspaceId })
+    .from(agentSessions)
+    .innerJoin(workspaces, eq(workspaces.id, agentSessions.workspaceId))
+    .where(
+      and(
+        eq(agentSessions.createdByUserId, userId),
+        eq(agentSessions.sessionId, sessionId),
+        eq(workspaces.kind, "company")
+      )
+    )
+    .limit(1);
+  return session;
 }

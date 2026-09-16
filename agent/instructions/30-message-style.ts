@@ -6,6 +6,7 @@ export default defineDynamic({
   events: {
     "turn.started": (_event, context) =>
       resolveModeInstructions(context, {
+        "company-report": messageStyle,
         interactive: messageStyle,
         "scheduled-report": messageStyle,
       }),
