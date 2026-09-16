@@ -35,6 +35,7 @@ export const userProfiles = pgTable(
     region: text("region"),
     postalCode: text("postal_code"),
     countryCode: text("country_code"),
+    timezone: text("timezone"),
     updatedAt: timestamp("updated_at", {
       mode: "date",
       precision: 3,

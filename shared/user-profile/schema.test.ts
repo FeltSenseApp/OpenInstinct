@@ -15,12 +15,14 @@ describe("user profile", () => {
         countryCode: "us",
         dateOfBirth: "1990-01-02",
         email: "person@example.com",
+        timezone: "America/New_York",
       })
     ).toEqual({
       ...emptyUserProfile,
       countryCode: "US",
       dateOfBirth: "1990-01-02",
       email: "person@example.com",
+      timezone: "America/New_York",
     });
   });
 
@@ -42,5 +44,14 @@ describe("user profile", () => {
     expect(
       JSON.stringify(z.toJSONSchema(userProfilePatchSchema))
     ).not.toContain("(?=");
+  });
+
+  it("requires an IANA timezone when one is saved", () => {
+    expect(
+      userProfilePatchSchema.safeParse({ timezone: "America/New_York" }).success
+    ).toBe(true);
+    expect(
+      userProfilePatchSchema.safeParse({ timezone: "Eastern" }).success
+    ).toBe(false);
   });
 });

@@ -36,6 +36,7 @@ export function PersonalInfoForm({
       phone: nullableFormValue(values.phone),
       postalCode: nullableFormValue(values.postalCode),
       region: nullableFormValue(values.region),
+      timezone: nullableFormValue(values.timezone),
     });
     if (!parsed.success) {
       setStatus("error");
@@ -66,8 +67,8 @@ export function PersonalInfoForm({
         <Alert variant="destructive">
           <AlertTitle>Couldn&apos;t save personal info</AlertTitle>
           <AlertDescription>
-            Check the email, birth date, and two-letter country code, then try
-            again.
+            Check the email, birth date, two-letter country code, and IANA
+            timezone, then try again.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -158,6 +159,20 @@ export function PersonalInfoForm({
               maxLength={2}
               name="countryCode"
               placeholder="US"
+            />
+          </div>
+        </section>
+
+        <section aria-labelledby="preferences-heading" className="space-y-4">
+          <h2 className="type-label" id="preferences-heading">
+            Preferences
+          </h2>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <ProfileField
+              defaultValue={initialProfile.timezone}
+              label="Timezone"
+              name="timezone"
+              placeholder="America/New_York"
             />
           </div>
         </section>
