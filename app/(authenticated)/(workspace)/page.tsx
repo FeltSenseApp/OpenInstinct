@@ -16,20 +16,29 @@ import { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
+import { Input } from "@web/components/ui/input";
 import { getGatewayModel } from "@db/services/settings";
+import {
+  listCompanyMembers,
+  listWorkspacesForUser,
+} from "@db/services/workspaces";
 import { env } from "@shared/environment";
 import { googleWorkspaceTokenParams } from "@shared/google-workspace/connection";
 import { requireRequestScope } from "@web/auth/request-scope";
 import { GoogleWorkspaceAction } from "./_components/google-workspace-action";
 import { ModelSelector } from "./_components/model-selector";
+import { addMember, createCompany, selectWorkspace } from "./actions";
 
 export default async function Page({ searchParams }: PageProps<"/">) {
-  const google = (await searchParams).google;
+  const { google, workspaceError } = await searchParams;
   const scope = await requireRequestScope();
-  const [googleWorkspace, gatewayModel] = await Promise.all([
-    readGoogleWorkspaceConnection(scope.userId),
-    getGatewayModel(scope),
-  ]);
+  const [googleWorkspace, gatewayModel, workspaces, companyMembership] =
+    await Promise.all([
+      readGoogleWorkspaceConnection(scope.userId),
+      getGatewayModel(scope),
+      listWorkspacesForUser(scope.userId),
+      listCompanyMembers(scope),
+    ]);
   const browserReady = true;
   const imageStorageReady = Boolean(
     env.BLOB_STORE_ID ?? env.BLOB_READ_WRITE_TOKEN
@@ -48,6 +57,21 @@ export default async function Page({ searchParams }: PageProps<"/">) {
           </AlertDescription>
         </Alert>
       ) : null}
+
+      {workspaceError ? (
+        <Alert variant="destructive">
+          <AlertTitle>Workspace update failed</AlertTitle>
+          <AlertDescription>
+            {workspaceErrorMessage(workspaceError)}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <CompanyWorkspacesSection
+        activeWorkspaceId={scope.workspaceId}
+        companyMembership={companyMembership}
+        workspaces={workspaces}
+      />
 
       <ChannelsSection
         browserReady={browserReady}
@@ -88,6 +112,123 @@ export default async function Page({ searchParams }: PageProps<"/">) {
       </WorkspaceSection>
     </div>
   );
+}
+
+function CompanyWorkspacesSection({
+  activeWorkspaceId,
+  companyMembership,
+  workspaces,
+}: {
+  readonly activeWorkspaceId: string;
+  readonly companyMembership:
+    | Awaited<ReturnType<typeof listCompanyMembers>>
+    | undefined;
+  readonly workspaces: Awaited<ReturnType<typeof listWorkspacesForUser>>;
+}) {
+  const active = workspaces.find(
+    (workspace) => workspace.id === activeWorkspaceId
+  );
+
+  return (
+    <WorkspaceSection headingId="workspaces-heading" title="Workspaces">
+      <div className="space-y-4 border-y border-border/50 py-4">
+        <form action={selectWorkspace} className="flex flex-wrap gap-2">
+          <select
+            aria-label="Active workspace"
+            className="type-input h-8 min-w-52 rounded-lg border border-input bg-background px-2.5"
+            defaultValue={activeWorkspaceId}
+            name="workspaceId"
+          >
+            {workspaces.map((workspace) => (
+              <option key={workspace.id} value={workspace.id}>
+                {workspace.kind === "personal"
+                  ? "Personal"
+                  : (workspace.name ?? "Company")}
+              </option>
+            ))}
+          </select>
+          <Button type="submit" variant="outline">
+            Open workspace
+          </Button>
+          {active ? (
+            <Badge variant="secondary">
+              {active.kind === "personal" ? "Personal" : active.role}
+            </Badge>
+          ) : null}
+        </form>
+
+        <form action={createCompany} className="flex flex-wrap gap-2">
+          <Input
+            aria-label="Company name"
+            className="max-w-xs"
+            maxLength={100}
+            name="name"
+            placeholder="Company name"
+            required
+          />
+          <Button type="submit">Create company workspace</Button>
+        </form>
+
+        {companyMembership ? (
+          <div className="space-y-3 rounded-lg border border-border/50 p-3">
+            <div>
+              <p className="type-label">Members</p>
+              <p className="type-caption text-muted-foreground">
+                {companyMembership.members.length} member
+                {companyMembership.members.length === 1 ? "" : "s"} in this
+                company workspace.
+              </p>
+            </div>
+            <ul className="space-y-1">
+              {companyMembership.members.map((member) => (
+                <li
+                  className="type-supporting-body flex items-center justify-between gap-3"
+                  key={member.email}
+                >
+                  <span>{member.name || member.email}</span>
+                  <Badge variant="secondary">{member.role}</Badge>
+                </li>
+              ))}
+            </ul>
+            {companyMembership.role === "owner" ? (
+              <form action={addMember} className="flex flex-wrap gap-2">
+                <input
+                  name="workspaceId"
+                  type="hidden"
+                  value={activeWorkspaceId}
+                />
+                <Input
+                  aria-label="Member email"
+                  className="max-w-xs"
+                  name="email"
+                  placeholder="Existing user email"
+                  required
+                  type="email"
+                />
+                <Button type="submit" variant="outline">
+                  Add member
+                </Button>
+              </form>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </WorkspaceSection>
+  );
+}
+
+function workspaceErrorMessage(error: string | string[] | undefined) {
+  const code = Array.isArray(error) ? error[0] : error;
+  if (code === "unknown-user") {
+    return "That person must sign in to OpenInstinct before you can add them.";
+  }
+  if (code === "not-a-member") {
+    return "You do not have access to that workspace.";
+  }
+  if (code === "invalid-company") {
+    return "Enter a company name between 1 and 100 characters.";
+  }
+  return "The member could not be added. Only a company owner can add members.";
 }
 
 function GoogleWorkspaceSection({

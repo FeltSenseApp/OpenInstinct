@@ -12,6 +12,8 @@ import {
   type AccessScope,
 } from "@shared/identity/access-scope";
 import { getAuthSession } from "@db/services/auth/session";
+import { resolveWorkspaceScope } from "@db/services/workspaces";
+import { workspaceIdFromCookieHeader } from "@shared/identity/workspace-selection";
 import { sendMessageToolResultSchema } from "@shared/chat/message-delivery";
 import {
   finalizeScheduledReportDelivery,
@@ -181,7 +183,10 @@ async function requestIdentityFromRequest(request: Request) {
 
   return {
     phoneNumber: phoneNumber.data,
-    scope: accessScopeForUser(`better-auth:${session.user.id}`),
+    scope: await resolveWorkspaceScope(
+      `better-auth:${session.user.id}`,
+      workspaceIdFromCookieHeader(request.headers.get("cookie"))
+    ),
   };
 }
 

@@ -25,6 +25,7 @@ export function scopeFromPrincipal(
   const { workspaceId } = principal.attributes;
   if (
     userId.startsWith("better-auth:") &&
+    workspaceId.startsWith("personal:") &&
     accessScopeForUser(userId).workspaceId !== workspaceId
   ) {
     throw new Error("The workspace does not belong to the authenticated user.");

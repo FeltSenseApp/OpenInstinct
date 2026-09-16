@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { QueryProvider } from "@app/_providers/query-provider";
 import { TooltipProvider } from "@web/components/ui/tooltip";
-import { accessScopeForUser } from "@shared/identity/access-scope";
+import { resolveWorkspaceScope } from "@db/services/workspaces";
+import { workspaceSelectionCookie } from "@shared/identity/workspace-selection";
 import { applicationOrigin } from "@shared/environment/origin";
 import { getAuthSession } from "@db/services/auth/session";
 import "./globals.css";
@@ -16,8 +17,16 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const session = await getAuthSession(await headers());
+  const requestedWorkspaceId = (await cookies()).get(
+    workspaceSelectionCookie
+  )?.value;
   const workspaceId = session
-    ? accessScopeForUser(`better-auth:${session.user.id}`).workspaceId
+    ? (
+        await resolveWorkspaceScope(
+          `better-auth:${session.user.id}`,
+          requestedWorkspaceId
+        )
+      ).workspaceId
     : undefined;
 
   return (

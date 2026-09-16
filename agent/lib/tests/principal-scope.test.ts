@@ -26,4 +26,18 @@ describe("principal scope", () => {
       })
     ).toThrow("does not belong to the authenticated user");
   });
+
+  it("accepts a company workspace selected by authenticated routing", () => {
+    expect(
+      scopeFromPrincipal({
+        attributes: { workspaceId: "company:acme" },
+        authenticator: "authjs",
+        principalId: "better-auth:user-1",
+        principalType: "user",
+      })
+    ).toEqual({
+      userId: "better-auth:user-1",
+      workspaceId: "company:acme",
+    });
+  });
 });

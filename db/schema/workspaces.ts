@@ -11,6 +11,10 @@ import {
 
 export const workspaces = pgTable("workspaces", {
   id: text("id").primaryKey(),
+  kind: text("kind", { enum: ["personal", "company"] })
+    .default("personal")
+    .notNull(),
+  name: text("name"),
   createdAt: timestamp("created_at", {
     mode: "date",
     precision: 3,
@@ -61,7 +65,7 @@ export const workspaceMemberships = pgTable(
   {
     workspaceId: text("workspace_id").notNull(),
     userId: text("user_id").notNull(),
-    role: text("role", { enum: ["owner"] }).notNull(),
+    role: text("role", { enum: ["owner", "member"] }).notNull(),
     createdAt: timestamp("created_at", {
       mode: "date",
       precision: 3,
@@ -80,7 +84,10 @@ export const workspaceMemberships = pgTable(
       columns: [table.workspaceId],
       foreignColumns: [workspaces.id],
     }).onDelete("cascade"),
-    check("workspace_memberships_role_check", sql`${table.role} = 'owner'`),
+    check(
+      "workspace_memberships_role_check",
+      sql`${table.role} IN ('owner', 'member')`
+    ),
   ]
 );
 
