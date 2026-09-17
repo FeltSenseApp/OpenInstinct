@@ -81,7 +81,7 @@ describe("schedule tools", () => {
     );
 
     expect(fetch).toHaveBeenCalledWith(
-      new URL("https://example.com/internal/scheduled-run/respond"),
+      new URL("https://example.com/eve/v1/scheduled-run/respond"),
       expect.objectContaining({ method: "POST" })
     );
 

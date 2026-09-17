@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import scheduledRunChannel from "@agent/channels/scheduled-run";
 
 const scheduledRunPaths = [
-  "/internal/scheduled-run/report",
-  "/internal/scheduled-run/respond",
+  "/eve/v1/scheduled-run/report",
+  "/eve/v1/scheduled-run/respond",
 ] as const;
 
 describe("scheduled run channel authentication", () => {

@@ -77,7 +77,7 @@ export default defineEval({
       if (!runId) throw new Error("The scheduled run was not persisted.");
 
       const reportResponse = await t.target.fetch(
-        "/internal/scheduled-run/report",
+        "/eve/v1/scheduled-run/report",
         {
           body: JSON.stringify({ runId }),
           headers: { "content-type": "application/json" },

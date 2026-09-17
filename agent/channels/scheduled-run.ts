@@ -23,7 +23,7 @@ export default defineChannel({
   },
   routes: [
     POST(
-      "/internal/scheduled-run/report",
+      "/eve/v1/scheduled-run/report",
       async (request, { attachSession, to, waitUntil }) => {
         const auth = await routeAuth(request, internalRouteAuth);
         if (auth instanceof Response) return auth;
@@ -37,7 +37,7 @@ export default defineChannel({
       }
     ),
     POST(
-      "/internal/scheduled-run/respond",
+      "/eve/v1/scheduled-run/respond",
       async (request, { attachSession }) => {
         const auth = await routeAuth(request, internalRouteAuth);
         if (auth instanceof Response) return auth;
