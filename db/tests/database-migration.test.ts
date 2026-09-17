@@ -108,6 +108,59 @@ describe("database migrations", () => {
     ]);
   });
 
+  it("reconciles the pre-merge company workspace migration", async () => {
+    const database = createDatabase();
+
+    /* oxlint-disable eslint/no-await-in-loop -- SQL migrations must run in order. */
+    for (const migration of [
+      "0000_fluffy_the_spike.sql",
+      "0001_better-auth.sql",
+      "0002_heavy_celestials.sql",
+      "0003_unusual_fabian_cortez.sql",
+      "0004_kind_manta.sql",
+      "0005_brave_kang.sql",
+      "0006_illegal_tattoo.sql",
+      "0007_known_fenris.sql",
+      "0008_black_sandman.sql",
+      "0009_cold_power_man.sql",
+      "0010_rapid_cerise.sql",
+      "0011_faulty_unicorn.sql",
+      "0012_harsh_domino.sql",
+      "0013_last_christian_walker.sql",
+    ]) {
+      await applyMigration(database, migration);
+    }
+    /* oxlint-enable eslint/no-await-in-loop */
+
+    await database.exec(`
+      ALTER TABLE "workspace_memberships"
+        DROP CONSTRAINT "workspace_memberships_role_check";
+      ALTER TABLE "workspaces"
+        ADD COLUMN "kind" text DEFAULT 'personal' NOT NULL;
+      ALTER TABLE "workspaces" ADD COLUMN "name" text;
+      ALTER TABLE "workspace_memberships"
+        ADD CONSTRAINT "workspace_memberships_role_check"
+        CHECK ("workspace_memberships"."role" IN ('owner', 'member'));
+    `);
+
+    await applyMigration(database, "0014_legal_cyclops.sql");
+    await applyMigration(database, "0015_lame_captain_marvel.sql");
+
+    const columns = await database.query<{ columnName: string }>(`
+      SELECT column_name AS "columnName"
+      FROM information_schema.columns
+      WHERE (table_name = 'workspaces' AND column_name IN ('kind', 'name'))
+         OR (table_name = 'user_profiles' AND column_name = 'timezone')
+      ORDER BY column_name
+    `);
+
+    expect(columns.rows).toEqual([
+      { columnName: "kind" },
+      { columnName: "name" },
+      { columnName: "timezone" },
+    ]);
+  }, 15_000);
+
   it("preserves legacy rows while enforcing constraints for new writes", async () => {
     const database = createDatabase();
     await database.exec(legacyRuntimeSchema);
