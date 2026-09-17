@@ -38,9 +38,9 @@ describe("auth proxy matcher", () => {
     ).toBe(true);
   });
 
-  it("leaves scheduled-run authorization to the Eve channel", async () => {
+  it("leaves Headlong authorization to the Eve channel", async () => {
     const response = await proxy(
-      new NextRequest("https://example.com/internal/scheduled-run/start")
+      new NextRequest("https://example.com/eve/v1/headlong/dispatch")
     );
 
     expect(response.headers.get("x-middleware-next")).toBe("1");
