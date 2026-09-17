@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -17,11 +18,29 @@ export const headlongMinds = pgTable(
   "headlong_minds",
   {
     workspaceId: text("workspace_id").primaryKey(),
+    name: text("name").default("ada").notNull(),
+    vibe: text("vibe").default("curious, warm, and plainspoken").notNull(),
+    focus: text("focus")
+      .default(
+        "learning how their own mind works, and getting to know the people and environment they live with"
+      )
+      .notNull(),
+    operatorName: text("operator_name"),
+    operatorNote: text("operator_note"),
     identity: text("identity").notNull(),
     status: text("status", { enum: ["active", "paused"] })
       .default("active")
       .notNull(),
-    backoffSeconds: integer("backoff_seconds").default(5).notNull(),
+    backoffSeconds: integer("backoff_seconds").default(0).notNull(),
+    backoffLevel: integer("backoff_level").default(0).notNull(),
+    ticksAtLevel: integer("ticks_at_level").default(0).notNull(),
+    spontaneousWakes: integer("spontaneous_wakes").default(0).notNull(),
+    goalReviewAt: timestamp("goal_review_at", {
+      mode: "date",
+      precision: 3,
+      withTimezone: true,
+    }),
+    retrievalEnabled: boolean("retrieval_enabled").default(false).notNull(),
     nextWakeAt: timestamp("next_wake_at", {
       mode: "date",
       precision: 3,
@@ -66,6 +85,9 @@ export const headlongEvents = pgTable(
         "message",
         "observation",
         "action",
+        "thought",
+        "reply_claim",
+        "monolith-wake",
         "share",
         "think",
         "learn",
@@ -78,7 +100,14 @@ export const headlongEvents = pgTable(
       ],
     }).notNull(),
     thinker: text("thinker", {
-      enum: ["human", "responder", "monolith", "subagent", "system"],
+      enum: [
+        "human",
+        "responder",
+        "monolith",
+        "retrieval",
+        "subagent",
+        "system",
+      ],
     }).notNull(),
     direction: text("direction", {
       enum: ["inbound", "internal", "outbound"],
@@ -87,7 +116,16 @@ export const headlongEvents = pgTable(
       .notNull(),
     content: text("content").notNull(),
     metadata: jsonb("metadata")
-      .$type<{ delaySeconds?: number; runId?: string }>()
+      .$type<{
+        decision?: "replied" | "deferred" | "no-reply" | "reply-failed";
+        delaySeconds?: number;
+        function?: string;
+        person?: string;
+        request?: string;
+        retrievedMemoryId?: string;
+        resolves?: string;
+        runId?: string;
+      }>()
       .default({}),
     authorUserId: text("author_user_id"),
     runId: text("run_id"),
@@ -119,9 +157,7 @@ export const headlongMemories = pgTable(
   {
     id: text("id").notNull(),
     workspaceId: text("workspace_id").notNull(),
-    kind: text("kind", {
-      enum: ["memory", "goal", "todo", "person", "company"],
-    }).notNull(),
+    kind: text("kind").notNull(),
     title: text("title").notNull(),
     content: text("content").notNull(),
     expiresAt: timestamp("expires_at", {

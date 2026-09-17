@@ -1,68 +1,78 @@
 import type { WorkflowToolContext } from "eve/tools";
-import { defineWorkflowTool } from "eve/tools";
+import { defineDynamic, defineWorkflowTool } from "eve/tools";
 import { sleep } from "workflow";
 import { z } from "zod";
 import { dispatchHeadlongThinker } from "@agent/lib/headlong/dispatch";
 import { headlongIdentity } from "@agent/lib/headlong/identity";
+import { resolveModeValue } from "@agent/lib/mode";
 import {
+  appendHeadlongEvent,
   recordMonolithResult,
   type HeadlongFunction,
 } from "@db/services/headlong";
 
-const memorySchema = z.object({
+const headlongFunctionInput = z.object({
   content: z.string().min(1).max(30_000),
-  expiresAt: z.iso.datetime({ offset: true }).nullable().optional(),
-  id: z.string().min(1).max(100).optional(),
-  kind: z.enum(["memory", "goal", "todo", "person", "company"]),
-  title: z.string().min(1).max(200),
+  function: z.enum([
+    "act",
+    "share",
+    "think",
+    "learn",
+    "recall",
+    "goals",
+    "values",
+    "idle",
+  ]),
+  resolves: z.string().min(1).max(100).optional(),
 });
 
-export default defineWorkflowTool({
+export const headlongFunction = defineWorkflowTool({
   description:
-    "Commit exactly one Headlong monolith function and durably schedule the company's next autonomous wake.",
-  inputSchema: z.object({
-    content: z.string().min(1).max(30_000),
-    function: z.enum([
-      "action",
-      "share",
-      "think",
-      "learn",
-      "recall",
-      "goals",
-      "values",
-      "idle",
-    ]),
-    memory: memorySchema.optional(),
-  }),
+    "Finish exactly one Headlong monolith function by appending its durable thought, observation, or idle step and scheduling the next wake. Use the memory tools before this call when learning or tending goals and values.",
+  inputSchema: headlongFunctionInput,
   execution: "background",
-  async execute(input, ctx) {
-    "use workflow";
-    const identity = readMonolithIdentity(ctx);
-    const committed = await commitFunction({
-      content: input.content,
-      fn: input.function,
-      memory: input.memory,
-      runId: identity.runId,
-      sessionId: identity.sessionId,
-      triggerEventId: identity.triggerEventId,
-      userId: identity.userId,
-      workspaceId: identity.workspaceId,
-    });
-    if (committed.delaySeconds > 0) {
-      await sleep(`${String(committed.delaySeconds)}s`);
-    }
-    await startNextWake({
-      eventId: committed.eventId,
-      userId: identity.userId,
-      workspaceId: identity.workspaceId,
-    });
-    return {
-      function: input.function,
-      nextWakeInSeconds: committed.delaySeconds,
-      recorded: true,
-    };
+  execute: executeHeadlongFunction,
+});
+
+export default defineDynamic({
+  events: {
+    "turn.started": (_event, context) =>
+      resolveModeValue(context, {
+        "headlong-monolith": { "headlong-function": headlongFunction },
+      }),
   },
 });
+
+async function executeHeadlongFunction(
+  input: z.infer<typeof headlongFunctionInput>,
+  ctx: WorkflowToolContext
+) {
+  "use workflow";
+  const identity = readMonolithIdentity(ctx);
+  const committed = await commitFunction({
+    content: input.content,
+    fn: input.function,
+    resolves: input.resolves,
+    runId: identity.runId,
+    sessionId: identity.sessionId,
+    triggerEventId: identity.triggerEventId,
+    userId: identity.userId,
+    workspaceId: identity.workspaceId,
+  });
+  if (committed.delaySeconds > 0) {
+    await sleep(`${String(committed.delaySeconds)}s`);
+  }
+  await startNextWake({
+    eventId: committed.eventId,
+    userId: identity.userId,
+    workspaceId: identity.workspaceId,
+  });
+  return {
+    function: input.function,
+    nextWakeInSeconds: committed.delaySeconds,
+    recorded: true,
+  };
+}
 
 function readMonolithIdentity(ctx: WorkflowToolContext) {
   const identity = headlongIdentity(ctx.session.auth);
@@ -81,13 +91,7 @@ function readMonolithIdentity(ctx: WorkflowToolContext) {
 async function commitFunction(input: {
   content: string;
   fn: HeadlongFunction;
-  memory?: {
-    content: string;
-    expiresAt?: string | null;
-    id?: string;
-    kind: "memory" | "goal" | "todo" | "person" | "company";
-    title: string;
-  };
+  resolves?: string;
   runId: string;
   sessionId: string;
   triggerEventId: string;
@@ -105,9 +109,16 @@ async function startNextWake(input: {
   workspaceId: string;
 }) {
   "use step";
+  const wake = await appendHeadlongEvent({
+    content: "scheduled autonomous wake",
+    parentId: input.eventId,
+    thinker: "system",
+    type: "monolith-wake",
+    workspaceId: input.workspaceId,
+  });
   return dispatchHeadlongThinker({
     scope: { userId: input.userId, workspaceId: input.workspaceId },
     thinker: "monolith",
-    triggerEventId: input.eventId,
+    triggerEventId: wake.id,
   });
 }

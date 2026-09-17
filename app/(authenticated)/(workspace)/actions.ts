@@ -8,6 +8,8 @@ import { getAuthSession } from "@db/services/auth/session";
 import {
   appendHeadlongEvent,
   appendHeadlongMessage,
+  initializeHeadlongIdentity,
+  setHeadlongRetrieval,
   setHeadlongMindStatus,
 } from "@db/services/headlong";
 import {
@@ -51,8 +53,15 @@ export async function createCompany(formData: FormData) {
   try {
     const scope = await createCompanyWorkspace(
       userId,
-      formText(formData, "name")
+      formText(formData, "companyName")
     );
+    await initializeHeadlongIdentity(scope, {
+      focus: formText(formData, "focus"),
+      name: formText(formData, "identityName"),
+      operatorName: formText(formData, "operatorName"),
+      operatorNote: formText(formData, "operatorNote"),
+      vibe: formText(formData, "vibe"),
+    });
     await selectWorkspaceCookie(scope.workspaceId);
   } catch {
     redirect("/?workspaceError=invalid-company");
@@ -98,9 +107,9 @@ export async function startHeadlong() {
   const scope = await activeScope();
   await setHeadlongMindStatus(scope, "active");
   const event = await appendHeadlongEvent({
-    content: "Manual autonomous wake requested by a company member.",
+    content: "manual autonomous wake",
     thinker: "system",
-    type: "observation",
+    type: "monolith-wake",
     workspaceId: scope.workspaceId,
   });
   await dispatchHeadlong({
@@ -116,6 +125,13 @@ export async function setHeadlongStatus(formData: FormData) {
   const scope = await activeScope();
   const status = z.enum(["active", "paused"]).parse(formData.get("status"));
   await setHeadlongMindStatus(scope, status);
+  revalidatePath("/");
+}
+
+export async function setRetrievalStatus(formData: FormData) {
+  const scope = await activeScope();
+  const enabled = z.enum(["true", "false"]).parse(formData.get("enabled"));
+  await setHeadlongRetrieval(scope, enabled === "true");
   revalidatePath("/");
 }
 

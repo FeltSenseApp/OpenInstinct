@@ -6,11 +6,7 @@ export default defineHook({
   events: {
     async "message.completed"(event, ctx) {
       const identity = headlongIdentity(ctx.session.auth);
-      if (
-        identity?.headlongThinker !== "responder" ||
-        event.data.finishReason !== "stop"
-      )
-        return;
+      if (!identity || event.data.finishReason !== "stop") return;
       await fail(
         identity,
         ctx.session.id,

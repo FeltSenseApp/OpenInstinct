@@ -120,6 +120,13 @@
       "when": 1789608127028,
       "tag": "0016_thankful_madame_masque",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789614846538,
+      "tag": "0017_military_warlock",
+      "breakpoints": true
     }
   ]
 }

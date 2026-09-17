@@ -1,17 +1,19 @@
-import { defineTool } from "eve/tools";
+import { defineDynamic, defineTool } from "eve/tools";
 import { z } from "zod";
+import { resolveModeValue } from "@agent/lib/mode";
 import { dispatchHeadlongThinker } from "@agent/lib/headlong/dispatch";
 import { headlongIdentity } from "@agent/lib/headlong/identity";
 import { recordResponderResult } from "@db/services/headlong";
 
-export default defineTool({
+export const headlongRespond = defineTool({
   description:
-    "Complete a Headlong responder wake with an optional outward reply and an observation for the monolith.",
+    "Complete one Headlong responder decision. Reply directly, defer real work to the monolith, or deliberately stay silent.",
   inputSchema: z.object({
-    observation: z.string().min(1).max(10_000),
-    reply: z.string().min(1).max(10_000).nullable(),
+    action: z.enum(["reply", "defer", "no_reply"]),
+    message: z.string().max(10_000),
+    request: z.string().max(10_000),
   }),
-  async execute({ observation, reply }, ctx) {
+  async execute({ action, message, request }, ctx) {
     const identity = headlongIdentity(ctx.session.auth);
     if (identity?.headlongThinker !== "responder") {
       throw new Error(
@@ -19,8 +21,9 @@ export default defineTool({
       );
     }
     const event = await recordResponderResult({
-      observation,
-      reply,
+      action,
+      message,
+      request,
       runId: identity.headlongRunId,
       sessionId: ctx.session.id,
       triggerEventId: identity.headlongTriggerEventId,
@@ -31,6 +34,19 @@ export default defineTool({
       thinker: "monolith",
       triggerEventId: event.id,
     });
-    return { recorded: true, replyPublished: reply !== null };
+    return {
+      action,
+      recorded: true,
+      replyPublished: action !== "no_reply" && Boolean(message.trim()),
+    };
+  },
+});
+
+export default defineDynamic({
+  events: {
+    "turn.started": (_event, context) =>
+      resolveModeValue(context, {
+        "headlong-responder": { "headlong-respond": headlongRespond },
+      }),
   },
 });

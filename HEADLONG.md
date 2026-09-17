@@ -1,38 +1,47 @@
 # Headlong on Eve
 
-This branch turns the deployed OpenInstinct company-workspace shell into a Headlong-style continuous company agent. Authentication, company membership, Postgres, Vercel, and Eve remain deployment infrastructure. The product surface and company execution path are Headlong-specific.
+This branch ports Headlong commit `f70f644eaab1a8a2caef5239d8284dc20d23615e` onto Eve. The inherited Open Instinct code is retained only where it supplies deployment infrastructure: authentication, company tenancy, Postgres, Vercel, connected services, and Eve session dispatch. A company is not part of Headlong's ontology. It is the ownership boundary for exactly one Headlong identity.
 
-## Runtime mapping
+## Source mapping
 
-| Headlong primitive    | Eve implementation                                                                                    |
-| --------------------- | ----------------------------------------------------------------------------------------------------- |
-| Identity              | One `headlong_minds` row per company workspace                                                        |
-| Root trajectory       | Append-only `headlong_events` rows shared by all company members                                      |
-| Dispatcher            | Idempotent run claims plus the internal Headlong Eve channel                                          |
-| Fast responder        | One bounded Eve root session per inbound company message                                              |
-| Monolith              | One bounded Eve root session per observation, merge, or timed wake                                    |
-| One function per wake | Required `headlong-function` workflow tool with the eight Headlong functions                          |
-| Adaptive self-wake    | Durable Eve Workflow `sleep`, resetting after work and backing off to 60/300 seconds                  |
-| Memory, goals, todos  | Typed, expirable `headlong_memories` records compiled into every wake                                 |
-| Child work            | Eve subagent sessions; their useful result is committed to the company trajectory by the monolith     |
-| Context rebuild       | Identity, trigger, active memory, cadence hints, and recent trajectory compiled for every bounded run |
+| Headlong primitive                               | Eve implementation                                                                                                                                           |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Identity directory and `core_identity_prompt.md` | One `headlong_minds` row per company workspace, created by the same short identity interview                                                                 |
+| File memories with arbitrary types               | `headlong_memories`; `kind` is open text and supports Headlong's fact, belief, value, todo, preference, goal, intention, objective, person, and custom types |
+| Append-only JSONL trajectory                     | Append-only `headlong_events` steps with parent links, source, direction, run, and Eve session provenance                                                    |
+| Thinker subscriptions                            | Explicit dispatch from inbound messages, responder observations, and durable `monolith-wake` steps                                                           |
+| Fast responder                                   | One tool-less-in-practice Eve run with the Headlong `reply`, `defer`, and `no_reply` structured decision                                                     |
+| Deferral index                                   | Responder `action` steps remain pending until a monolith observation names their trigger in `resolves`                                                       |
+| Monolith router                                  | One bounded Eve run choosing exactly one of `act`, `share`, `think`, `learn`, `recall`, `goals`, `values`, or `idle`                                         |
+| Shellm tools and child processes                 | Eve tools and subagents; the useful durable result is appended to the root trajectory                                                                        |
+| Dispatcher timer                                 | Durable Eve Workflow sleep followed by an explicit `monolith-wake` trajectory step                                                                           |
+| Adaptive backoff                                 | Headlong's level-based 5/10/20/40… cadence, three-wake dwell, 60-second thought cap, and 300-second idle cap                                                 |
+| Related-memory thinker context                   | Up to three lexical matches from the identity memory store on every wake                                                                                     |
+| Optional retrieval thinker                       | Disabled-by-default passive lexical recall, with a per-identity dashboard toggle and 20-surfacing suppression window                                         |
+| Share and goal-review nudges                     | Every twelfth spontaneous wake and once-weekly goal review, respectively                                                                                     |
 
-The trajectory—not an individual model transcript—is the company mind. Eve sessions are execution records for bounded thinker wakes. That preserves Headlong's responder/monolith concurrency without pretending one model call lives forever.
+The Headlong trajectory is the persistent mind. Eve sessions are bounded execution records attached to its steps; they are not treated as the identity or memory.
+
+## Intentional host substitutions
+
+- Postgres rows replace Headlong's local Markdown and JSONL files so the state survives Vercel deployments and can be shared safely by company members.
+- Eve Workflow timers replace Headlong's always-alive filesystem dispatcher.
+- Eve sessions and subagents replace Shellm runs and child processes.
+- The browser and connected-service tools supplied by the deployment replace Headlong's machine-local CLI skill binaries.
+- The company workspace is only authorization and tenancy. No company-specific memory type, company soul, or company-agent behavior is introduced.
 
 ## Wake behavior
 
-- `action` and `share` schedule an immediate next wake and reset backoff to five seconds.
-- `think`, `learn`, `recall`, `goals`, and `values` exponentially back off with a 60-second ceiling.
-- `idle` exponentially backs off with a 300-second ceiling.
-- Every twelfth monolith wake includes a share hint.
-- A goal review hint appears when no goal review was recorded in the preceding week.
-- Run claims and tool commits are idempotent, including replay of a durable workflow step.
+- External observations engage the monolith immediately and reset pacing.
+- `act` and `share` are visible work and reset pacing to level zero.
+- Thought-only wakes descend the same three-wake backoff ladder, capped at 60 seconds.
+- `idle` descends the ladder to a 300-second cap.
+- Each scheduled continuation is represented by a `monolith-wake` step before a new run is claimed.
+- Run claims and terminal function commits are idempotent under workflow replay.
 
-## Deployment
+## Verification
 
-Apply Drizzle migrations `0015` and `0016`, then deploy the Next.js app and Eve runtime together. Existing company workspace memberships become the authorization boundary for a company's mind. A company mind is created lazily the first time its dashboard opens.
-
-Useful verification commands:
+Apply all Drizzle migrations through `0017`, then deploy the Next.js app and Eve runtime together.
 
 ```sh
 pnpm check

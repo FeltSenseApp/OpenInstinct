@@ -26,6 +26,7 @@ import {
   addMember,
   createCompany,
   sendHeadlongMessage,
+  setRetrievalStatus,
   setHeadlongStatus,
   selectWorkspace,
   startHeadlong,
@@ -45,11 +46,12 @@ export default async function Page({ searchParams }: PageProps<"/">) {
         <header className="space-y-3">
           <Badge variant="secondary">Headlong on Eve</Badge>
           <h1 className="type-display-title">
-            Give every company a mind that keeps going.
+            Give every company one persistent identity.
           </h1>
           <p className="type-body text-muted-foreground">
-            Create or open a company. Its responder, monolith, trajectory,
-            goals, and memories persist independently of any chat.
+            This is Headlong on Eve. The company is only the ownership boundary;
+            the identity, responder, monolith, trajectory, and file-style
+            memories keep going independently of any chat.
           </p>
         </header>
         {error ? (
@@ -83,16 +85,49 @@ export default async function Page({ searchParams }: PageProps<"/">) {
                 Open
               </Button>
             </form>
-            <form action={createCompany} className="flex flex-wrap gap-2">
+            <form action={createCompany} className="grid gap-3 sm:grid-cols-2">
               <Input
-                className="max-w-sm"
                 maxLength={100}
-                name="name"
-                placeholder="New company name"
+                name="companyName"
+                placeholder="Company name"
                 required
               />
+              <Input
+                defaultValue="ada"
+                maxLength={60}
+                name="identityName"
+                pattern="[a-z0-9][a-z0-9-]*"
+                placeholder="Identity name (lowercase)"
+                required
+              />
+              <Input
+                defaultValue="curious, warm, and plainspoken"
+                maxLength={200}
+                name="vibe"
+                placeholder="What is their vibe?"
+              />
+              <Input
+                maxLength={100}
+                name="operatorName"
+                placeholder="Your name (optional)"
+              />
+              <Textarea
+                className="sm:col-span-2"
+                defaultValue="learning how their own mind works, and getting to know the people and environment they live with"
+                maxLength={500}
+                name="focus"
+                placeholder="What should they think about when idle?"
+                rows={2}
+              />
+              <Textarea
+                className="sm:col-span-2"
+                maxLength={500}
+                name="operatorNote"
+                placeholder="Something they should know about the people who brought them to life (optional)"
+                rows={2}
+              />
               <Button type="submit">
-                <Building2Icon /> Create company
+                <Building2Icon /> Create identity
               </Button>
             </form>
           </CardContent>
@@ -109,7 +144,11 @@ export default async function Page({ searchParams }: PageProps<"/">) {
     (event) => event.direction === "outbound"
   );
   const goals = dashboard.memories.filter(
-    (memory) => memory.kind === "goal" || memory.kind === "todo"
+    (memory) =>
+      memory.kind === "goal" ||
+      memory.kind === "intention" ||
+      memory.kind === "objective" ||
+      memory.kind === "todo"
   );
 
   return (
@@ -127,8 +166,11 @@ export default async function Page({ searchParams }: PageProps<"/">) {
               {dashboard.mind.status}
             </Badge>
           </div>
-          <h1 className="type-display-title">{dashboard.mind.companyName}</h1>
-          <p className="type-supporting-body max-w-2xl text-muted-foreground">
+          <p className="type-caption text-muted-foreground">
+            {dashboard.mind.companyName}
+          </p>
+          <h1 className="type-display-title">{dashboard.mind.name}</h1>
+          <p className="type-supporting-body max-w-2xl whitespace-pre-line text-muted-foreground">
             {dashboard.mind.identity}
           </p>
         </div>
@@ -157,7 +199,7 @@ export default async function Page({ searchParams }: PageProps<"/">) {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Talk to the company</CardTitle>
+              <CardTitle>Talk to {dashboard.mind.name}</CardTitle>
               <CardDescription>
                 The fast responder answers; the monolith inherits every promise
                 and continues the work.
@@ -168,11 +210,11 @@ export default async function Page({ searchParams }: PageProps<"/">) {
                 <Textarea
                   maxLength={20_000}
                   name="message"
-                  placeholder={`Message ${dashboard.mind.companyName}…`}
+                  placeholder={`Message ${dashboard.mind.name}…`}
                   required
                   rows={4}
                 />
-                <Button type="submit">Send to company</Button>
+                <Button type="submit">Send</Button>
               </form>
             </CardContent>
           </Card>
@@ -181,8 +223,8 @@ export default async function Page({ searchParams }: PageProps<"/">) {
             <CardHeader>
               <CardTitle>Live trajectory</CardTitle>
               <CardDescription>
-                One append-only company history across every bounded Eve thinker
-                run.
+                One append-only Headlong trajectory across every bounded Eve
+                thinker run.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -236,6 +278,10 @@ export default async function Page({ searchParams }: PageProps<"/">) {
                 value={String(dashboard.runs.length)}
               />
               <RuntimeRow
+                label="Backoff level"
+                value={String(dashboard.mind.backoffLevel)}
+              />
+              <RuntimeRow
                 label="Backoff"
                 value={`${String(dashboard.mind.backoffSeconds)}s`}
               />
@@ -247,6 +293,17 @@ export default async function Page({ searchParams }: PageProps<"/">) {
                 }
               />
               <RuntimeRow label="Outbound" value={String(outward.length)} />
+              <form action={setRetrievalStatus} className="pt-2">
+                <input
+                  name="enabled"
+                  type="hidden"
+                  value={String(!dashboard.mind.retrievalEnabled)}
+                />
+                <Button size="sm" type="submit" variant="outline">
+                  Passive retrieval:{" "}
+                  {dashboard.mind.retrievalEnabled ? "on" : "off"}
+                </Button>
+              </form>
               <div className="flex items-center gap-2 pt-2 text-muted-foreground">
                 <Clock3Icon className="size-4" /> durable Eve workflow timers
               </div>
