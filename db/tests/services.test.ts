@@ -430,7 +430,7 @@ async function applyChatChannelMigration(database: PGlite) {
 
 async function applyCompanyWorkspaceMigration(database: PGlite) {
   const migration = await readFile(
-    new URL("../migrations/0014_flashy_unus.sql", import.meta.url),
+    new URL("../migrations/0015_lame_captain_marvel.sql", import.meta.url),
     "utf8"
   );
   /* oxlint-disable eslint/no-await-in-loop -- SQL migration statements must execute in file order. */

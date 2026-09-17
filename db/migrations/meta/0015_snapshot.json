@@ -1,6 +1,6 @@
 {
-  "id": "21a17d20-2a36-4a70-813f-87eae4200ddc",
-  "prevId": "8d971fcd-e5d8-46d2-93a1-93d6e8ccb63a",
+  "id": "e8924abc-f62d-4d9e-a5f7-9a1c7bb960af",
+  "prevId": "21a17d20-2a36-4a70-813f-87eae4200ddc",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1909,7 +1909,7 @@
       "checkConstraints": {
         "workspace_memberships_role_check": {
           "name": "workspace_memberships_role_check",
-          "value": "\"workspace_memberships\".\"role\" = 'owner'"
+          "value": "\"workspace_memberships\".\"role\" IN ('owner', 'member')"
         }
       },
       "isRLSEnabled": false
@@ -1923,6 +1923,19 @@
           "type": "text",
           "primaryKey": true,
           "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'personal'"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",

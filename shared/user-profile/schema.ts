@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { timezoneSchema } from "@shared/schedules/timing";
 
 const nullableText = (maximum: number) =>
   z.string().trim().min(1).max(maximum).nullable();
@@ -28,6 +29,7 @@ export const userProfileSchema = z.object({
   phone: nullableText(100),
   postalCode: nullableText(100),
   region: nullableText(200),
+  timezone: timezoneSchema.nullable(),
 });
 
 export const userProfilePatchSchema = userProfileSchema
@@ -51,6 +53,7 @@ export const emptyUserProfile = {
   phone: null,
   postalCode: null,
   region: null,
+  timezone: null,
 } satisfies UserProfile;
 
 export function hasUserProfileValues(profile: UserProfile) {
