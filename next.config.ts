@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 import { withEve } from "eve/next";
 
-const nextConfig: NextConfig = {};
+const config: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "2mb"
+    }
+  }
+};
 
-export default withEve(nextConfig);
+export default withEve(config);

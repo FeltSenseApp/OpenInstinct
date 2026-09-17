@@ -1,25 +1,14 @@
-minimumReleaseAgeStrict: true
-minimumReleaseAge: 1440
-minimumReleaseAgeExclude:
-  # Eve 0.44.4's current official scaffold resolves the matching AI SDK release cohort.
-  - "@ai-sdk/*"
-  - ai
-  - "@vercel/*"
-  - "@onkernel/*"
-  - eve
-  # These browser and rendering transitive releases are locked by the current Eve UI scaffold.
-  - baseline-browser-mapping
-  - caniuse-lite
-  - electron-to-chromium
-  - mermaid
-  - picomatch
-  - systeminformation
+packages:
+  - "."
+onlyBuiltDependencies:
+  - "@google/genai"
+  - "@swc/core"
+  - cbor-extract
+  - esbuild
+  - sharp
 allowBuilds:
-  "@google/genai": false
-  cbor-extract: false
+  "@google/genai": true
+  "@swc/core": true
+  cbor-extract: true
   esbuild: true
-  protobufjs: false
   sharp: true
-patchedDependencies:
-  "@linqapp/chat-sdk-adapter@0.5.1": patches/@linqapp__chat-sdk-adapter@0.5.1.patch
-  "eve@0.55.0": patches/eve@0.55.0.patch
