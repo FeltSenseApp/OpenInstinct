@@ -14,14 +14,15 @@ export default defineChannel({
   audience: () => "private",
   routes: [
     POST("/eve/v1/headlong/internal/dispatch", async (request, { from }) => {
-      const authenticated = await routeAuth(request, [
-        vercelOidc(),
-        localDev()
-      ]);
-      if (authenticated instanceof Response) return authenticated;
-
-      let stage = "parse";
+      let stage = "auth";
       try {
+        const authenticated = await routeAuth(request, [
+          vercelOidc(),
+          localDev()
+        ]);
+        if (authenticated instanceof Response) return authenticated;
+
+        stage = "parse";
         const input = schema.parse(await request.json());
         stage = "prepare";
         const prepared = await prepareDispatch(input);
