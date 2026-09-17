@@ -2,14 +2,21 @@
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAuthSession } from "@db/services/auth/session";
+import {
+  appendHeadlongEvent,
+  appendHeadlongMessage,
+  setHeadlongMindStatus,
+} from "@db/services/headlong";
 import {
   addCompanyMember,
   createCompanyWorkspace,
   resolveWorkspaceScope,
 } from "@db/services/workspaces";
 import { env } from "@shared/environment";
+import { requestInternalRoute } from "@shared/eve/internal-request";
 import { workspaceSelectionCookie } from "@shared/identity/workspace-selection";
 
 async function authenticatedUserId() {
@@ -70,6 +77,72 @@ export async function addMember(formData: FormData) {
     redirect(`/?workspaceError=${code}`);
   }
   redirect("/");
+}
+
+export async function sendHeadlongMessage(formData: FormData) {
+  const scope = await activeScope();
+  const event = await appendHeadlongMessage(
+    scope,
+    formText(formData, "message")
+  );
+  await dispatchHeadlong({
+    thinker: "responder",
+    triggerEventId: event.id,
+    userId: scope.userId,
+    workspaceId: scope.workspaceId,
+  });
+  revalidatePath("/");
+}
+
+export async function startHeadlong() {
+  const scope = await activeScope();
+  await setHeadlongMindStatus(scope, "active");
+  const event = await appendHeadlongEvent({
+    content: "Manual autonomous wake requested by a company member.",
+    thinker: "system",
+    type: "observation",
+    workspaceId: scope.workspaceId,
+  });
+  await dispatchHeadlong({
+    thinker: "monolith",
+    triggerEventId: event.id,
+    userId: scope.userId,
+    workspaceId: scope.workspaceId,
+  });
+  revalidatePath("/");
+}
+
+export async function setHeadlongStatus(formData: FormData) {
+  const scope = await activeScope();
+  const status = z.enum(["active", "paused"]).parse(formData.get("status"));
+  await setHeadlongMindStatus(scope, status);
+  revalidatePath("/");
+}
+
+async function activeScope() {
+  const userId = await authenticatedUserId();
+  return resolveWorkspaceScope(
+    userId,
+    (await cookies()).get(workspaceSelectionCookie)?.value
+  );
+}
+
+async function dispatchHeadlong(input: {
+  thinker: "responder" | "monolith";
+  triggerEventId: string;
+  userId: string;
+  workspaceId: string;
+}) {
+  const response = await requestInternalRoute("/eve/v1/headlong/dispatch", {
+    body: JSON.stringify(input),
+    headers: { "content-type": "application/json" },
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Headlong dispatch failed with status ${String(response.status)}.`
+    );
+  }
 }
 
 function formText(formData: FormData, key: string) {

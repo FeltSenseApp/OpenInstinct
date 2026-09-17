@@ -38,6 +38,7 @@ describe("source layout", () => {
       "browser",
       "chat",
       "environment",
+      "eve",
       "google-workspace",
       "identity",
       "schedules",

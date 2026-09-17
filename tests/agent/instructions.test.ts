@@ -1,11 +1,31 @@
 import type { DynamicResolveContext } from "eve/instructions";
 import { describe, expect, it } from "vitest";
+import headlongInstructions from "@agent/instructions/05-headlong";
 import executionSafety from "@agent/instructions/10-execution-safety";
 import roleInstructions from "@agent/instructions/20-role";
 import workerCoordination from "@agent/instructions/25-worker-coordination";
 import messageStyle from "@agent/instructions/30-message-style";
 
 describe("agent instructions", () => {
+  it("isolates Headlong wakes from the legacy assistant roles", async () => {
+    const context = dynamicContext("headlong-monolith");
+    context.session.auth.current.attributes = {
+      headlongThinker: "monolith",
+    };
+    expect(
+      await roleInstructions.events["turn.started"]?.({}, context)
+    ).toBeNull();
+    expect(
+      await workerCoordination.events["turn.started"]?.({}, context)
+    ).toBeNull();
+    const selected = await headlongInstructions.events["session.started"]?.(
+      {},
+      context
+    );
+    expect(selected?.content).toContain("bounded monolith wake");
+    expect(selected?.content).toContain("headlong-function exactly once");
+  });
+
   it.each([
     ["scheduled-worker", "isolated background session"],
     ["scheduled-result", "evaluating the completed outcome"],

@@ -17,6 +17,7 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2022",
+    "types": ["eve/workflow-modules"],
     "plugins": [
       {
         "name": "next"

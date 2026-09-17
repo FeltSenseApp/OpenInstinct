@@ -20,6 +20,7 @@ export default defineDynamic({
       });
       return resolveModeValue(context, {
         "company-worker": worker,
+        "headlong-monolith": worker,
         interactive: worker,
         "scheduled-worker": worker,
       });

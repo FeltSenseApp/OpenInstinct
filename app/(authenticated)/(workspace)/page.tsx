@@ -1,415 +1,361 @@
 import {
-  BotIcon,
-  CloudIcon,
-  ImageIcon,
-  MailIcon,
-  MessageSquareIcon,
+  BrainCircuitIcon,
+  Building2Icon,
+  Clock3Icon,
+  PlayIcon,
 } from "lucide-react";
-import Link from "next/link";
-import type { ReactNode } from "react";
-import {
-  getTokenResponse,
-  NoValidTokenError,
-  UserAuthorizationRequiredError,
-} from "@vercel/connect";
-import { z } from "zod";
-import { Alert, AlertDescription, AlertTitle } from "@web/components/ui/alert";
 import { Badge } from "@web/components/ui/badge";
 import { Button } from "@web/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@web/components/ui/card";
 import { Input } from "@web/components/ui/input";
-import { getGatewayModel } from "@db/services/settings";
+import { Textarea } from "@web/components/ui/textarea";
+import { getHeadlongDashboard } from "@db/services/headlong";
 import {
   listCompanyMembers,
   listWorkspacesForUser,
 } from "@db/services/workspaces";
-import { env } from "@shared/environment";
-import { googleWorkspaceTokenParams } from "@shared/google-workspace/connection";
 import { requireRequestScope } from "@web/auth/request-scope";
-import { GoogleWorkspaceAction } from "./_components/google-workspace-action";
-import { ModelSelector } from "./_components/model-selector";
-import { addMember, createCompany, selectWorkspace } from "./actions";
+import { HeadlongLiveRefresh } from "./_components/headlong-live-refresh";
+import {
+  addMember,
+  createCompany,
+  sendHeadlongMessage,
+  setHeadlongStatus,
+  selectWorkspace,
+  startHeadlong,
+} from "./actions";
 
 export default async function Page({ searchParams }: PageProps<"/">) {
-  const { google, workspaceError } = await searchParams;
   const scope = await requireRequestScope();
-  const [googleWorkspace, gatewayModel, workspaces, companyMembership] =
-    await Promise.all([
-      readGoogleWorkspaceConnection(scope.userId),
-      getGatewayModel(scope),
-      listWorkspacesForUser(scope.userId),
-      listCompanyMembers(scope),
-    ]);
-  const browserReady = true;
-  const imageStorageReady = Boolean(
-    env.BLOB_STORE_ID ?? env.BLOB_READ_WRITE_TOKEN
-  );
-
-  return (
-    <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-8 px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="sr-only">Workspace</h1>
-
-      {google === "unavailable" ? (
-        <Alert>
-          <MailIcon />
-          <AlertTitle>Google Workspace unavailable</AlertTitle>
-          <AlertDescription>
-            This deployment does not have a working Google OAuth connector yet.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {workspaceError ? (
-        <Alert variant="destructive">
-          <AlertTitle>Workspace update failed</AlertTitle>
-          <AlertDescription>
-            {workspaceErrorMessage(workspaceError)}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      <CompanyWorkspacesSection
-        activeWorkspaceId={scope.workspaceId}
-        companyMembership={companyMembership}
-        workspaces={workspaces}
-      />
-
-      <ChannelsSection
-        browserReady={browserReady}
-        linqConfigured={env.LINQ_CONNECTOR !== undefined}
-        linqPhoneNumber={env.LINQ_PHONE_NUMBER}
-      />
-      <GoogleWorkspaceSection connection={googleWorkspace} />
-
-      <WorkspaceSection headingId="connectors-heading" title="Infrastructure">
-        <div className="divide-y divide-border/50 border-y border-border/50">
-          <ConnectorRow
-            action={<Badge variant="success">Connected</Badge>}
-            description="Run isolated browsers in your Kernel account."
-            icon={<CloudIcon />}
-            label="Kernel browser"
-          />
-          <ConnectorRow
-            action={
-              <Badge variant={imageStorageReady ? "success" : "secondary"}>
-                {imageStorageReady ? "Connected" : "Setup required"}
-              </Badge>
-            }
-            description={
-              imageStorageReady
-                ? "Store browser images in a private Vercel Blob store."
-                : "Connect a private Vercel Blob store to share browser images."
-            }
-            icon={<ImageIcon />}
-            label="Vercel Blob"
-          />
-          <ConnectorRow
-            action={<ModelSelector modelId={gatewayModel} />}
-            description={gatewayModel}
-            icon={<BotIcon />}
-            label="AI Gateway model"
-          />
-        </div>
-      </WorkspaceSection>
-    </div>
-  );
-}
-
-function CompanyWorkspacesSection({
-  activeWorkspaceId,
-  companyMembership,
-  workspaces,
-}: {
-  readonly activeWorkspaceId: string;
-  readonly companyMembership:
-    | Awaited<ReturnType<typeof listCompanyMembers>>
-    | undefined;
-  readonly workspaces: Awaited<ReturnType<typeof listWorkspacesForUser>>;
-}) {
+  const workspaces = await listWorkspacesForUser(scope.userId);
   const active = workspaces.find(
-    (workspace) => workspace.id === activeWorkspaceId
+    (workspace) => workspace.id === scope.workspaceId
   );
+  const error = (await searchParams).workspaceError;
 
-  return (
-    <WorkspaceSection headingId="workspaces-heading" title="Workspaces">
-      <div className="space-y-4 border-y border-border/50 py-4">
-        <form action={selectWorkspace} className="flex flex-wrap gap-2">
-          <select
-            aria-label="Active workspace"
-            className="type-input h-8 min-w-52 rounded-lg border border-input bg-background px-2.5"
-            defaultValue={activeWorkspaceId}
-            name="workspaceId"
-          >
-            {workspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.kind === "personal"
-                  ? "Personal"
-                  : (workspace.name ?? "Company")}
-              </option>
-            ))}
-          </select>
-          <Button type="submit" variant="outline">
-            Open workspace
-          </Button>
-          {active ? (
-            <Badge variant="secondary">
-              {active.kind === "personal" ? "Personal" : active.role}
-            </Badge>
-          ) : null}
-        </form>
-
-        <form action={createCompany} className="flex flex-wrap gap-2">
-          <Input
-            aria-label="Company name"
-            className="max-w-xs"
-            maxLength={100}
-            name="name"
-            placeholder="Company name"
-            required
-          />
-          <Button type="submit">Create company workspace</Button>
-        </form>
-
-        {companyMembership ? (
-          <div className="space-y-3 rounded-lg border border-border/50 p-3">
-            <div>
-              <p className="type-label">Members</p>
-              <p className="type-caption text-muted-foreground">
-                {companyMembership.members.length} member
-                {companyMembership.members.length === 1 ? "" : "s"} in this
-                company workspace.
-              </p>
-            </div>
-            <ul className="space-y-1">
-              {companyMembership.members.map((member) => (
-                <li
-                  className="type-supporting-body flex items-center justify-between gap-3"
-                  key={member.email}
-                >
-                  <span>{member.name || member.email}</span>
-                  <Badge variant="secondary">{member.role}</Badge>
-                </li>
-              ))}
-            </ul>
-            {companyMembership.role === "owner" ? (
-              <form action={addMember} className="flex flex-wrap gap-2">
-                <input
-                  name="workspaceId"
-                  type="hidden"
-                  value={activeWorkspaceId}
-                />
-                <Input
-                  aria-label="Member email"
-                  className="max-w-xs"
-                  name="email"
-                  placeholder="Existing user email"
-                  required
-                  type="email"
-                />
-                <Button type="submit" variant="outline">
-                  Add member
-                </Button>
-              </form>
-            ) : null}
-          </div>
+  if (active?.kind !== "company") {
+    return (
+      <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6">
+        <header className="space-y-3">
+          <Badge variant="secondary">Headlong on Eve</Badge>
+          <h1 className="type-display-title">
+            Give every company a mind that keeps going.
+          </h1>
+          <p className="type-body text-muted-foreground">
+            Create or open a company. Its responder, monolith, trajectory,
+            goals, and memories persist independently of any chat.
+          </p>
+        </header>
+        {error ? (
+          <p className="type-supporting-body text-destructive">
+            The workspace change could not be completed.
+          </p>
         ) : null}
-      </div>
-    </WorkspaceSection>
-  );
-}
-
-function workspaceErrorMessage(error: string | string[] | undefined) {
-  const code = Array.isArray(error) ? error[0] : error;
-  if (code === "unknown-user") {
-    return "That person must sign in to OpenInstinct before you can add them.";
-  }
-  if (code === "not-a-member") {
-    return "You do not have access to that workspace.";
-  }
-  if (code === "invalid-company") {
-    return "Enter a company name between 1 and 100 characters.";
-  }
-  return "The member could not be added. Only a company owner can add members.";
-}
-
-function GoogleWorkspaceSection({
-  connection,
-}: {
-  readonly connection?: GoogleWorkspaceConnection;
-}) {
-  const state = connection?.state;
-  const description =
-    state === "connected"
-      ? (connection?.accountLabel ?? "Gmail, Calendar, and Contacts connected.")
-      : state === "unavailable"
-        ? "Attach a Vercel Connect Google OAuth connector to enable this."
-        : "Gmail, Calendar, and Contacts through your Google account.";
-
-  return (
-    <WorkspaceSection headingId="connections-heading" title="Connections">
-      <div className="divide-y divide-border/50 border-y border-border/50">
-        <ConnectorRow
-          action={<GoogleWorkspaceAction state={state} />}
-          description={description}
-          icon={<MailIcon />}
-          label="Google Workspace"
-        />
-      </div>
-    </WorkspaceSection>
-  );
-}
-
-interface GoogleWorkspaceConnection {
-  readonly accountLabel: string | null;
-  readonly state: "connected" | "disconnected" | "unavailable";
-}
-
-async function readGoogleWorkspaceConnection(
-  userId: string
-): Promise<GoogleWorkspaceConnection> {
-  try {
-    const response = await getTokenResponse(
-      env.GOOGLE_CONNECTOR_UID,
-      googleWorkspaceTokenParams(userId),
-      { forceRefresh: true }
+        <Card>
+          <CardHeader>
+            <CardTitle>Companies</CardTitle>
+            <CardDescription>
+              Each company owns exactly one continuous Headlong mind.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form action={selectWorkspace} className="flex flex-wrap gap-2">
+              <select
+                className="type-input h-9 min-w-60 rounded-lg border border-input bg-background px-3"
+                defaultValue={scope.workspaceId}
+                name="workspaceId"
+              >
+                {workspaces.map((workspace) => (
+                  <option key={workspace.id} value={workspace.id}>
+                    {workspace.kind === "personal"
+                      ? "Choose a company…"
+                      : workspace.name}
+                  </option>
+                ))}
+              </select>
+              <Button type="submit" variant="outline">
+                Open
+              </Button>
+            </form>
+            <form action={createCompany} className="flex flex-wrap gap-2">
+              <Input
+                className="max-w-sm"
+                maxLength={100}
+                name="name"
+                placeholder="New company name"
+                required
+              />
+              <Button type="submit">
+                <Building2Icon /> Create company
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </main>
     );
-    const claims = z
-      .object({ email: z.string().optional() })
-      .safeParse(response.claims);
-    return {
-      accountLabel:
-        response.name ?? (claims.success ? (claims.data.email ?? null) : null),
-      state: "connected",
-    };
-  } catch (error) {
-    if (
-      error instanceof UserAuthorizationRequiredError ||
-      error instanceof NoValidTokenError
-    ) {
-      return { accountLabel: null, state: "disconnected" };
-    }
-    return { accountLabel: null, state: "unavailable" };
   }
-}
 
-export function ChannelsSection({
-  browserReady,
-  linqConfigured,
-  linqPhoneNumber,
-}: {
-  readonly browserReady: boolean;
-  readonly linqConfigured: boolean;
-  readonly linqPhoneNumber?: string;
-}) {
+  const [dashboard, membership] = await Promise.all([
+    getHeadlongDashboard(scope),
+    listCompanyMembers(scope),
+  ]);
+  const outward = dashboard.events.filter(
+    (event) => event.direction === "outbound"
+  );
+  const goals = dashboard.memories.filter(
+    (memory) => memory.kind === "goal" || memory.kind === "todo"
+  );
+
   return (
-    <WorkspaceSection headingId="channels-heading" title="Channels">
-      <div className="grid gap-2 sm:grid-cols-2">
-        {browserReady ? (
-          <Button
-            nativeButton={false}
-            render={<Link href="/chat" />}
-            variant="surface"
-          >
-            <MessageSquareIcon />
-            WebChat
-          </Button>
-        ) : (
-          <Button disabled variant="surface">
-            <MessageSquareIcon />
-            WebChat
-          </Button>
-        )}
-        {linqConfigured && linqPhoneNumber ? (
-          <Button
-            nativeButton={false}
-            render={
-              <a aria-label="Open iMessage" href={`sms:${linqPhoneNumber}`} />
-            }
-            variant="surface"
-          >
-            <MailIcon />
-            iMessage
-          </Button>
-        ) : (
-          <Button disabled variant="surface">
-            <MailIcon />
-            iMessage
-          </Button>
-        )}
-      </div>
-      <p className="type-caption text-muted-foreground">
-        {channelAvailabilityMessage({
-          browserReady,
-          linqConfigured,
-          linqPhoneNumber,
-        })}
-      </p>
-    </WorkspaceSection>
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6">
+      <HeadlongLiveRefresh />
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-5">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <BrainCircuitIcon className="size-5" />
+            <Badge
+              variant={
+                dashboard.mind.status === "active" ? "success" : "secondary"
+              }
+            >
+              {dashboard.mind.status}
+            </Badge>
+          </div>
+          <h1 className="type-display-title">{dashboard.mind.companyName}</h1>
+          <p className="type-supporting-body max-w-2xl text-muted-foreground">
+            {dashboard.mind.identity}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <form action={setHeadlongStatus}>
+            <input
+              name="status"
+              type="hidden"
+              value={dashboard.mind.status === "active" ? "paused" : "active"}
+            />
+            <Button type="submit" variant="outline">
+              {dashboard.mind.status === "active"
+                ? "Pause mind"
+                : "Resume mind"}
+            </Button>
+          </form>
+          <form action={startHeadlong}>
+            <Button type="submit">
+              <PlayIcon /> Wake now
+            </Button>
+          </form>
+        </div>
+      </header>
+
+      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(18rem,0.8fr)]">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Talk to the company</CardTitle>
+              <CardDescription>
+                The fast responder answers; the monolith inherits every promise
+                and continues the work.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={sendHeadlongMessage} className="space-y-3">
+                <Textarea
+                  maxLength={20_000}
+                  name="message"
+                  placeholder={`Message ${dashboard.mind.companyName}…`}
+                  required
+                  rows={4}
+                />
+                <Button type="submit">Send to company</Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Live trajectory</CardTitle>
+              <CardDescription>
+                One append-only company history across every bounded Eve thinker
+                run.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ol className="divide-y divide-border/50 border-y border-border/50">
+                {dashboard.events.length === 0 ? (
+                  <li className="type-supporting-body py-8 text-center text-muted-foreground">
+                    Wake the mind or send its first message.
+                  </li>
+                ) : (
+                  dashboard.events.map((event) => (
+                    <li
+                      className="grid gap-2 py-4 sm:grid-cols-[8rem_minmax(0,1fr)]"
+                      key={event.id}
+                    >
+                      <div className="space-y-1">
+                        <Badge
+                          variant={
+                            event.direction === "outbound"
+                              ? "success"
+                              : "secondary"
+                          }
+                        >
+                          {event.type}
+                        </Badge>
+                        <p className="type-caption text-muted-foreground">
+                          {event.thinker}
+                        </p>
+                        <time className="type-caption text-muted-foreground">
+                          {event.createdAt.toLocaleString()}
+                        </time>
+                      </div>
+                      <p className="type-supporting-body whitespace-pre-wrap">
+                        {event.content}
+                      </p>
+                    </li>
+                  ))
+                )}
+              </ol>
+            </CardContent>
+          </Card>
+        </div>
+
+        <aside className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Runtime</CardTitle>
+            </CardHeader>
+            <CardContent className="type-supporting-body space-y-3">
+              <RuntimeRow
+                label="Thinker runs"
+                value={String(dashboard.runs.length)}
+              />
+              <RuntimeRow
+                label="Backoff"
+                value={`${String(dashboard.mind.backoffSeconds)}s`}
+              />
+              <RuntimeRow
+                label="Next wake"
+                value={
+                  dashboard.mind.nextWakeAt?.toLocaleTimeString() ??
+                  "Not scheduled"
+                }
+              />
+              <RuntimeRow label="Outbound" value={String(outward.length)} />
+              <div className="flex items-center gap-2 pt-2 text-muted-foreground">
+                <Clock3Icon className="size-4" /> durable Eve workflow timers
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Goals and todos</CardTitle>
+              <CardDescription>
+                Durable working commitments chosen by the monolith.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                {goals.length ? (
+                  goals.map((memory) => (
+                    <li
+                      className="rounded-lg border border-border/60 p-3"
+                      key={memory.id}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="type-label">{memory.title}</span>
+                        <Badge variant="secondary">{memory.kind}</Badge>
+                      </div>
+                      <p className="mt-1 type-caption text-muted-foreground">
+                        {memory.content}
+                      </p>
+                    </li>
+                  ))
+                ) : (
+                  <li className="type-supporting-body text-muted-foreground">
+                    No goals yet.
+                  </li>
+                )}
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Company members</CardTitle>
+              <CardDescription>
+                Everyone here shares the same agent and trajectory.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ul className="space-y-2">
+                {membership?.members.map((member) => (
+                  <li
+                    className="type-supporting-body flex items-center justify-between gap-2"
+                    key={member.email}
+                  >
+                    <span>{member.name || member.email}</span>
+                    <Badge variant="secondary">{member.role}</Badge>
+                  </li>
+                ))}
+              </ul>
+              {membership?.role === "owner" ? (
+                <form action={addMember} className="space-y-2">
+                  <input
+                    name="workspaceId"
+                    type="hidden"
+                    value={scope.workspaceId}
+                  />
+                  <Input
+                    name="email"
+                    placeholder="Existing user email"
+                    required
+                    type="email"
+                  />
+                  <Button type="submit" variant="outline">
+                    Add member
+                  </Button>
+                </form>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <form action={selectWorkspace}>
+            <input
+              name="workspaceId"
+              type="hidden"
+              value={
+                workspaces.find((workspace) => workspace.kind === "personal")
+                  ?.id
+              }
+            />
+            <Button type="submit" variant="ghost">
+              Switch company
+            </Button>
+          </form>
+        </aside>
+      </section>
+    </main>
   );
 }
 
-function channelAvailabilityMessage({
-  browserReady,
-  linqConfigured,
-  linqPhoneNumber,
-}: {
-  readonly browserReady: boolean;
-  readonly linqConfigured: boolean;
-  readonly linqPhoneNumber?: string;
-}) {
-  return [
-    browserReady
-      ? "WebChat is ready."
-      : "KERNEL_API_KEY is required to enable WebChat.",
-    linqConfigured && linqPhoneNumber
-      ? `iMessage opens ${linqPhoneNumber}.`
-      : linqConfigured
-        ? "Linq is connected. Use its assigned line to start an iMessage."
-        : "Set up Linq to enable iMessage.",
-  ].join(" ");
-}
-
-function WorkspaceSection({
-  children,
-  headingId,
-  title,
-}: {
-  readonly children: ReactNode;
-  readonly headingId: string;
-  readonly title: string;
-}) {
-  return (
-    <section aria-labelledby={headingId} className="space-y-3">
-      <h2 className="type-section-title" id={headingId}>
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-function ConnectorRow({
-  action,
-  description,
-  icon,
+function RuntimeRow({
   label,
+  value,
 }: {
-  readonly action: ReactNode;
-  readonly description: string;
-  readonly icon: ReactNode;
   readonly label: string;
+  readonly value: string;
 }) {
   return (
-    <div className="flex items-center gap-3 py-4">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted/50 text-muted-foreground">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="type-label">{label}</p>
-        <p className="truncate type-caption text-muted-foreground">
-          {description}
-        </p>
-      </div>
-      {action}
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="type-label">{value}</span>
     </div>
   );
 }
