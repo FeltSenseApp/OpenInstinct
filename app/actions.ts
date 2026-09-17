@@ -35,7 +35,7 @@ export async function createIdentityAction(formData: FormData) {
     source: "dispatcher",
     content: "first autonomous wake"
   });
-  await requestDispatch({
+  await dispatchOrRecordError({
     identityId: identity.id,
     thinker: "monolith",
     triggerStepId: wake.id
@@ -59,7 +59,7 @@ export async function sendMessageAction(
     recipient: identity.name
   });
   await resetPacing(identityId);
-  await requestDispatch({
+  await dispatchOrRecordError({
     identityId,
     thinker: "responder",
     triggerStepId: step.id
@@ -75,7 +75,7 @@ export async function wakeIdentityAction(identityId: string) {
     source: "operator",
     content: "manual wake"
   });
-  await requestDispatch({
+  await dispatchOrRecordError({
     identityId,
     thinker: "monolith",
     triggerStepId: wake.id
@@ -162,4 +162,25 @@ async function resetPacing(identityId: string) {
      WHERE id = $1`,
     [identityId]
   );
+}
+
+async function dispatchOrRecordError(input: {
+  identityId: string;
+  thinker: "monolith" | "responder";
+  triggerStepId: string;
+}) {
+  try {
+    return await requestDispatch(input);
+  } catch (error) {
+    await appendStep({
+      identityId: input.identityId,
+      type: "error",
+      source: "dispatcher",
+      content:
+        error instanceof Error ? error.message : "Headlong dispatch failed.",
+      triggerStepId: input.triggerStepId,
+      fields: { thinker: input.thinker }
+    });
+    return { status: "failed" as const };
+  }
 }
