@@ -1,10 +1,9 @@
 import type { WorkflowToolContext } from "eve/tools";
-import { defineDynamic, defineWorkflowTool } from "eve/tools";
+import { defineWorkflowTool } from "eve/tools";
 import { sleep } from "workflow";
 import { z } from "zod";
 import { dispatchHeadlongThinker } from "@agent/lib/headlong/dispatch";
 import { headlongIdentity } from "@agent/lib/headlong/identity";
-import { resolveModeValue } from "@agent/lib/mode";
 import {
   appendHeadlongEvent,
   recordMonolithResult,
@@ -26,21 +25,12 @@ const headlongFunctionInput = z.object({
   resolves: z.string().min(1).max(100).optional(),
 });
 
-export const headlongFunction = defineWorkflowTool({
+export default defineWorkflowTool({
   description:
     "Finish exactly one Headlong monolith function by appending its durable thought, observation, or idle step and scheduling the next wake. Use the memory tools before this call when learning or tending goals and values.",
   inputSchema: headlongFunctionInput,
   execution: "background",
   execute: executeHeadlongFunction,
-});
-
-export default defineDynamic({
-  events: {
-    "turn.started": (_event, context) =>
-      resolveModeValue(context, {
-        "headlong-monolith": { "headlong-function": headlongFunction },
-      }),
-  },
 });
 
 async function executeHeadlongFunction(
