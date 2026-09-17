@@ -10,7 +10,7 @@ export async function requestDispatch(input: {
   thinker: Exclude<Thinker, "recap">;
   triggerStepId: string;
 }) {
-  const response = await internalRequest("/headlong/internal/dispatch", {
+  const response = await internalRequest("/eve/v1/headlong/internal/dispatch", {
     body: JSON.stringify(input),
     headers: { "content-type": "application/json" },
     method: "POST"

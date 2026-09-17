@@ -13,7 +13,7 @@ export default defineChannel({
   turnPolicy: "queue",
   audience: () => "private",
   routes: [
-    POST("/headlong/internal/dispatch", async (request, { from }) => {
+    POST("/eve/v1/headlong/internal/dispatch", async (request, { from }) => {
       const authenticated = await routeAuth(request, [
         vercelOidc(),
         localDev()
