@@ -33,7 +33,11 @@ export async function ensureRollups(identityId: string) {
     const completeEnd = Math.floor(count / width) * width;
     const missing = await query<{ start_sequence: string }>(
       `WITH blocks AS (
-         SELECT generate_series(0, $3 - $2, $2)::bigint AS start_sequence
+         SELECT generate_series(
+           0::bigint,
+           $3::bigint - $2::bigint,
+           $2::bigint
+         ) AS start_sequence
        )
        SELECT blocks.start_sequence::text
        FROM blocks
