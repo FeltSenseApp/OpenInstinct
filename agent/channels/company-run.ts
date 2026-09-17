@@ -5,6 +5,10 @@ import {
   companyRunRespondSchema,
   companyRunStartSchema,
 } from "@agent/lib/company-run/request";
+import {
+  dispatchRootSession,
+  founderAgentId,
+} from "@agent/lib/eve/dispatch-root-session";
 import linq from "./linq";
 
 const internalRouteAuth = [vercelOidc(), localDev()];
@@ -14,19 +18,31 @@ export default defineChannel({
     return auth?.principalType === "user" ? "private" : "unknown";
   },
   routes: [
-    POST("/eve/v1/company-run/start", async (request, { from }) => {
+    POST("/eve/v1/company-run/start", async (request) => {
       const auth = await routeAuth(request, internalRouteAuth);
       if (auth instanceof Response) return auth;
       const input = companyRunStartSchema.parse(await request.json());
-      const session = await from(`company-run:${input.companyDispatchId}`).send(
-        companyWorkerPrompt(input),
-        {
-          auth: companyWorkerAuth(input),
-          title: `${input.companyName}: ${input.task.slice(0, 120)}`,
-        }
-      );
+      const returnRoute = {
+        channel: input.originChannel,
+        conversationId: input.originConversationId,
+        replyAnchorMessageId: input.originReplyAnchorMessageId ?? null,
+      };
+      const { sessionId } = await dispatchRootSession({
+        idempotencyKey: `company-run:${input.companyDispatchId}`,
+        principal: companyWorkerAuth(input),
+        provenance: {
+          companyDispatchId: input.companyDispatchId,
+          originChannel: input.originChannel,
+          originConversationId: input.originConversationId,
+          sourceType: "personal-agent",
+        },
+        returnRoute,
+        targetAgentId: founderAgentId,
+        targetWorkspaceId: input.targetWorkspaceId,
+        task: companyWorkerPrompt(input),
+      });
       return Response.json(
-        { dispatchId: input.companyDispatchId, sessionId: session.id },
+        { dispatchId: input.companyDispatchId, sessionId },
         { status: 202 }
       );
     }),
@@ -57,30 +73,27 @@ export default defineChannel({
         });
       }
     ),
-    POST(
-      "/eve/v1/company-run/respond",
-      async (request, { attachSession }) => {
-        const auth = await routeAuth(request, internalRouteAuth);
-        if (auth instanceof Response) return auth;
-        const input = companyRunRespondSchema.parse(await request.json());
-        const result = await attachSession(input.workerSessionId).send(
-          input.answer,
-          {
-            auth: {
-              attributes: { workspaceId: input.targetWorkspaceId },
-              authenticator: "company-answer",
-              issuer: "open-instinct",
-              principalId: input.userId,
-              principalType: "user",
-            },
-            turnPolicy: "queue",
-          }
-        );
-        return new Response(null, {
-          status: result.status === "session_not_active" ? 409 : 202,
-        });
-      }
-    ),
+    POST("/eve/v1/company-run/respond", async (request, { attachSession }) => {
+      const auth = await routeAuth(request, internalRouteAuth);
+      if (auth instanceof Response) return auth;
+      const input = companyRunRespondSchema.parse(await request.json());
+      const result = await attachSession(input.workerSessionId).send(
+        input.answer,
+        {
+          auth: {
+            attributes: { workspaceId: input.targetWorkspaceId },
+            authenticator: "company-answer",
+            issuer: "open-instinct",
+            principalId: input.userId,
+            principalType: "user",
+          },
+          turnPolicy: "queue",
+        }
+      );
+      return new Response(null, {
+        status: result.status === "session_not_active" ? 409 : 202,
+      });
+    }),
   ],
 });
 

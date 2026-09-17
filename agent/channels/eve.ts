@@ -4,6 +4,7 @@ import {
   localDev,
   routeAuth,
   UnauthenticatedError,
+  vercelOidc,
 } from "eve/channels/auth";
 import { z } from "zod";
 import { isSessionOwned } from "@db/services/sessions";
@@ -20,10 +21,30 @@ import {
   releaseScheduledReportDelivery,
   scheduledReportFromSession,
 } from "@agent/lib/schedules/report-lifecycle";
+import { isInternalRootDispatch } from "@agent/lib/eve/dispatch-root-session";
 
 const authenticateLocalDev = localDev();
+const authenticateVercelInternal = vercelOidc();
+
+const authenticateInternalDispatch: Parameters<typeof routeAuth>[1] = async (
+  request
+) => {
+  if (!isInternalRootDispatch(request)) return null;
+  const principal =
+    (await authenticateVercelInternal(request)) ??
+    (await authenticateLocalDev(request));
+  if (!principal) return null;
+  return {
+    ...principal,
+    attributes: {
+      ...principal.attributes,
+      openInstinctInternalDispatch: "v1",
+    },
+  };
+};
 
 const authenticate: Parameters<typeof routeAuth>[1] = [
+  authenticateInternalDispatch,
   async (request) => {
     const identity = await requestIdentityFromRequest(request);
     if (!identity) return null;
@@ -71,6 +92,8 @@ const authenticate: Parameters<typeof routeAuth>[1] = [
 
 const channel = eveChannel({
   auth: authenticate,
+  trustedForwarders: (forwarder) =>
+    forwarder.attributes.openInstinctInternalDispatch === "v1",
   events: {
     async "action.result"(event, _channel, session) {
       if (

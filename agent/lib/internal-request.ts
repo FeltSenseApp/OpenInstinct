@@ -10,16 +10,26 @@ const eveDevServerSchema = z.object({
 });
 
 export async function postInternalRoute(path: string, serializedBody: string) {
+  return requestInternalRoute(path, {
+    body: serializedBody,
+    headers: { "content-type": "application/json" },
+    method: "POST",
+  });
+}
+
+export async function requestInternalRoute(
+  path: string,
+  init: Omit<RequestInit, "headers"> & { readonly headers?: HeadersInit }
+) {
   const token = env.VERCEL_ENV ? await getVercelOidcToken() : undefined;
-  const headers = new Headers({ "content-type": "application/json" });
+  const headers = new Headers(init.headers);
   if (token) {
     headers.set("authorization", `Bearer ${token}`);
     headers.set("x-vercel-trusted-oidc-idp-token", token);
   }
   return fetch(new URL(path, await internalOrigin()), {
-    body: serializedBody,
+    ...init,
     headers,
-    method: "POST",
     redirect: "error",
   });
 }
