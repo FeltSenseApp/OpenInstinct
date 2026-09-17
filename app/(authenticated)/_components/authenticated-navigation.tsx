@@ -20,7 +20,7 @@ export function AuthenticatedNavigation() {
             <SidebarMenuItem>
               <SidebarMenuButton isActive render={<Link href="/" />}>
                 <BrainCircuitIcon />
-                <span>Company mind</span>
+                <span>Identity</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -34,7 +34,7 @@ export function AuthenticatedMobileHeader() {
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/50 px-4 md:hidden">
       <SidebarTrigger />
-      <span className="type-label">Company mind</span>
+      <span className="type-label">Identity</span>
     </header>
   );
 }

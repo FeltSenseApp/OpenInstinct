@@ -161,6 +161,43 @@ export async function ensureHeadlongMind(scope: AccessScope) {
     .where(eq(headlongMinds.workspaceId, scope.workspaceId))
     .limit(1);
   if (!mind) throw new Error("The Headlong identity could not be initialized.");
+  if (mind.identity.includes("continuously operating company agent")) {
+    const legacyName = slugIdentity(company.name ?? "ada");
+    const upgradedIdentity = renderStarterPersona({
+      focus,
+      name: legacyName,
+      vibe,
+    });
+    await db.transaction(async (transaction) => {
+      await transaction
+        .update(headlongMinds)
+        .set({
+          focus,
+          identity: upgradedIdentity,
+          name: legacyName,
+          updatedAt: new Date(),
+          vibe,
+        })
+        .where(eq(headlongMinds.workspaceId, scope.workspaceId));
+      await transaction
+        .update(headlongMemories)
+        .set({ kind: "fact", updatedAt: new Date() })
+        .where(
+          and(
+            eq(headlongMemories.workspaceId, scope.workspaceId),
+            eq(headlongMemories.kind, "company")
+          )
+        );
+    });
+    return {
+      ...mind,
+      companyName: company.name ?? "Company",
+      focus,
+      identity: upgradedIdentity,
+      name: legacyName,
+      vibe,
+    };
+  }
   return { ...mind, companyName: company.name ?? "Company" };
 }
 
