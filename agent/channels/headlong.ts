@@ -19,28 +19,45 @@ export default defineChannel({
         localDev()
       ]);
       if (authenticated instanceof Response) return authenticated;
-      const input = schema.parse(await request.json());
-      const prepared = await prepareDispatch(input);
-      if (prepared.status !== "ready") {
-        return Response.json(prepared, { status: 202 });
+
+      let stage = "parse";
+      try {
+        const input = schema.parse(await request.json());
+        stage = "prepare";
+        const prepared = await prepareDispatch(input);
+        if (prepared.status !== "ready") {
+          return Response.json(prepared, { status: 202 });
+        }
+        const token =
+          input.thinker === "monolith"
+            ? `mind:${input.identityId}`
+            : `responder:${input.triggerStepId}`;
+        const source = from(token);
+        if (input.thinker === "monolith") {
+          stage = "clear";
+          await source.clear().catch(() => undefined);
+        }
+        stage = "send";
+        const session = await source.send(prepared.context, {
+          auth: prepared.principal,
+          turnPolicy: "queue"
+        });
+        stage = "mark-running";
+        await markRunRunning(prepared.runId, session.id);
+        return Response.json(
+          { sessionId: session.id, status: "started" },
+          { status: 202 }
+        );
+      } catch (error) {
+        return Response.json(
+          {
+            error: error instanceof Error ? error.message : "Unknown channel failure",
+            ok: false,
+            stage
+          },
+          { status: 500 }
+        );
       }
-      const token =
-        input.thinker === "monolith"
-          ? `mind:${input.identityId}`
-          : `responder:${input.triggerStepId}`;
-      const source = from(token);
-      if (input.thinker === "monolith") {
-        await source.clear().catch(() => undefined);
-      }
-      const session = await source.send(prepared.context, {
-        auth: prepared.principal,
-        turnPolicy: "queue"
-      });
-      await markRunRunning(prepared.runId, session.id);
-      return Response.json(
-        { sessionId: session.id, status: "started" },
-        { status: 202 }
-      );
     })
   ]
 });
