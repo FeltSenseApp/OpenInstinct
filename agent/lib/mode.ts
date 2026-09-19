@@ -11,6 +11,8 @@ interface AgentModeContext {
 }
 
 function agentMode(authenticator: string | undefined) {
+  if (authenticator === "company-worker") return "company-worker" as const;
+  if (authenticator === "company-result") return "company-report" as const;
   if (authenticator === "scheduled-worker") return "scheduled-worker" as const;
   if (authenticator === "scheduled-result") return "scheduled-report" as const;
   return "interactive" as const;
@@ -19,6 +21,9 @@ function agentMode(authenticator: string | undefined) {
 type AgentMode = ReturnType<typeof agentMode>;
 
 function sessionAgentMode(auth: AgentModeContext["session"]["auth"]) {
+  if (auth.initiator?.authenticator === "company-worker") {
+    return "company-worker" as const;
+  }
   if (auth.initiator?.authenticator === "scheduled-worker") {
     return "scheduled-worker" as const;
   }

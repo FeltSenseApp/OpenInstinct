@@ -38,14 +38,17 @@ describe("auth proxy matcher", () => {
     ).toBe(true);
   });
 
-  it("leaves scheduled-run authorization to the Eve channel", async () => {
-    const response = await proxy(
-      new NextRequest("https://example.com/internal/scheduled-run/start")
-    );
+  it.each(["company-run/start", "scheduled-run/report"])(
+    "leaves %s authorization to the Eve channel",
+    async (route) => {
+      const response = await proxy(
+        new NextRequest(`https://example.com/eve/v1/${route}`)
+      );
 
-    expect(response.headers.get("x-middleware-next")).toBe("1");
-    expect(getAuthSession).not.toHaveBeenCalled();
-  });
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+      expect(getAuthSession).not.toHaveBeenCalled();
+    }
+  );
 
   it("allows the schedule dispatcher without a browser session in development", async () => {
     const response = await proxy(

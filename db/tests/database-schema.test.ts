@@ -97,6 +97,11 @@ describe("database schema", () => {
     expect(vaultItems.id.getSQLType()).toBe("text");
   });
 
+  it("distinguishes personal and company workspaces with owner/member access", () => {
+    expect(workspaces.kind.enumValues).toEqual(["personal", "company"]);
+    expect(workspaceMemberships.role.enumValues).toEqual(["owner", "member"]);
+  });
+
   it("anchors session creators to a membership in the same workspace", () => {
     for (const table of [
       agentSessions,

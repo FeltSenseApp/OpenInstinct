@@ -43,6 +43,7 @@ export function resolveProfileMemoryScope(context: MemoryScopeContext) {
       ? workspaceId.data
       : null;
   return resolveModeValue(context, {
+    "company-worker": scope,
     interactive: scope,
     "scheduled-worker": scope,
   });

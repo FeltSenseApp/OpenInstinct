@@ -52,6 +52,7 @@ export default defineDynamic({
         | { send_message: typeof send_message };
 
       return resolveModeValue<MessagingTools>(context, {
+        "company-report": { send_message },
         interactive,
         "scheduled-report": { send_message },
       });

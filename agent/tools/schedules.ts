@@ -95,7 +95,7 @@ export const answerSchedule = defineTool({
       throw new Error("That scheduled task is not waiting for input.");
     }
     const response = await postScheduledRunRoute(
-      "/internal/scheduled-run/respond",
+      "/eve/v1/scheduled-run/respond",
       {
         answer,
         leaseToken: pending.leaseToken,

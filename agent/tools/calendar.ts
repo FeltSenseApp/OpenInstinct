@@ -54,6 +54,10 @@ export default defineDynamic({
   events: {
     "turn.started": (_event, context) =>
       resolveModeValue(context, {
+        "company-worker": {
+          "calendar-check-availability": calendarCheckAvailability,
+          "calendar-list-events": calendarListEvents,
+        },
         interactive: {
           "calendar-check-availability": calendarCheckAvailability,
           "calendar-create-event": calendarCreateEvent,

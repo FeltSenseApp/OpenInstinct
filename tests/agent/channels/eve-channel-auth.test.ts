@@ -2,11 +2,17 @@ import type { RouteHandlerArgs } from "eve/channels";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as AuthSession from "@db/services/auth/session";
 import * as SessionService from "@db/services/sessions";
+import * as WorkspaceService from "@db/services/workspaces";
 import { authSessionFor } from "@tests/helpers/auth-session";
 import eveChannel, { sessionIdFromPath } from "@agent/channels/eve";
+import { accessScopeForUser } from "@shared/identity/access-scope";
 
 const getAuthSessionMock = vi.spyOn(AuthSession, "getAuthSession");
 const isSessionOwnedMock = vi.spyOn(SessionService, "isSessionOwned");
+const resolveWorkspaceScopeMock = vi.spyOn(
+  WorkspaceService,
+  "resolveWorkspaceScope"
+);
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -19,6 +25,10 @@ beforeEach(() => {
     })
   );
   isSessionOwnedMock.mockResolvedValue(false);
+  resolveWorkspaceScopeMock.mockImplementation(async (userId) => ({
+    userId,
+    workspaceId: accessScopeForUser(userId).workspaceId,
+  }));
 });
 
 afterEach(() => {

@@ -9,10 +9,6 @@ import {
   restoreScheduledAgentRunInput,
 } from "@db/services/scheduled-agent-jobs";
 
-const scheduledRunTargetSchema = z.strictObject({
-  restart: z.boolean().optional(),
-  runId: z.uuid(),
-});
 const reportSchema = z.strictObject({ runId: z.uuid() });
 const respondSchema = z.strictObject({
   answer: z.string().trim().min(1).max(8_000),
@@ -25,22 +21,9 @@ export default defineChannel({
   audience({ auth }) {
     return auth?.principalType === "user" ? "private" : "unknown";
   },
-  async receive(input, { from }) {
-    const target = scheduledRunTargetSchema.parse(input.target);
-    const source = from(`scheduled-run:${target.runId}`);
-    if (target.restart) {
-      await source.reset({
-        reason: "Scheduled worker exceeded its runtime.",
-      });
-    }
-    return source.send(input.message, {
-      auth: input.auth,
-      title: `Scheduled run ${target.runId}`,
-    });
-  },
   routes: [
     POST(
-      "/internal/scheduled-run/report",
+      "/eve/v1/scheduled-run/report",
       async (request, { attachSession, to, waitUntil }) => {
         const auth = await routeAuth(request, internalRouteAuth);
         if (auth instanceof Response) return auth;
@@ -54,7 +37,7 @@ export default defineChannel({
       }
     ),
     POST(
-      "/internal/scheduled-run/respond",
+      "/eve/v1/scheduled-run/respond",
       async (request, { attachSession }) => {
         const auth = await routeAuth(request, internalRouteAuth);
         if (auth instanceof Response) return auth;

@@ -4,6 +4,7 @@ import {
   localDev,
   routeAuth,
   UnauthenticatedError,
+  vercelOidc,
 } from "eve/channels/auth";
 import { z } from "zod";
 import { isSessionOwned } from "@db/services/sessions";
@@ -12,16 +13,38 @@ import {
   type AccessScope,
 } from "@shared/identity/access-scope";
 import { getAuthSession } from "@db/services/auth/session";
+import { resolveWorkspaceScope } from "@db/services/workspaces";
+import { workspaceIdFromCookieHeader } from "@shared/identity/workspace-selection";
 import { sendMessageToolResultSchema } from "@shared/chat/message-delivery";
 import {
   finalizeScheduledReportDelivery,
   releaseScheduledReportDelivery,
   scheduledReportFromSession,
 } from "@agent/lib/schedules/report-lifecycle";
+import { isInternalRootDispatch } from "@agent/lib/eve/dispatch-root-session";
 
 const authenticateLocalDev = localDev();
+const authenticateVercelInternal = vercelOidc();
+
+const authenticateInternalDispatch: Parameters<typeof routeAuth>[1] = async (
+  request
+) => {
+  if (!isInternalRootDispatch(request)) return null;
+  const principal =
+    (await authenticateVercelInternal(request)) ??
+    (await authenticateLocalDev(request));
+  if (!principal) return null;
+  return {
+    ...principal,
+    attributes: {
+      ...principal.attributes,
+      openInstinctInternalDispatch: "v1",
+    },
+  };
+};
 
 const authenticate: Parameters<typeof routeAuth>[1] = [
+  authenticateInternalDispatch,
   async (request) => {
     const identity = await requestIdentityFromRequest(request);
     if (!identity) return null;
@@ -69,6 +92,8 @@ const authenticate: Parameters<typeof routeAuth>[1] = [
 
 const channel = eveChannel({
   auth: authenticate,
+  trustedForwarders: (forwarder) =>
+    forwarder.attributes.openInstinctInternalDispatch === "v1",
   events: {
     async "action.result"(event, _channel, session) {
       if (
@@ -181,7 +206,10 @@ async function requestIdentityFromRequest(request: Request) {
 
   return {
     phoneNumber: phoneNumber.data,
-    scope: accessScopeForUser(`better-auth:${session.user.id}`),
+    scope: await resolveWorkspaceScope(
+      `better-auth:${session.user.id}`,
+      workspaceIdFromCookieHeader(request.headers.get("cookie"))
+    ),
   };
 }
 

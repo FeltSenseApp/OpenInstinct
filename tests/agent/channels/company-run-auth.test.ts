@@ -1,23 +1,24 @@
 import type { RouteHandlerArgs } from "eve/channels";
 import { describe, expect, it } from "vitest";
-import scheduledRunChannel from "@agent/channels/scheduled-run";
+import companyRunChannel from "@agent/channels/company-run";
 
-const scheduledRunPaths = [
-  "/eve/v1/scheduled-run/report",
-  "/eve/v1/scheduled-run/respond",
+const paths = [
+  "/eve/v1/company-run/start",
+  "/eve/v1/company-run/report",
+  "/eve/v1/company-run/respond",
 ] as const;
 
-describe("scheduled run channel authentication", () => {
-  for (const path of scheduledRunPaths) {
+describe("company run channel authentication", () => {
+  for (const path of paths) {
     it(`rejects an unauthenticated request to ${path}`, async () => {
-      const route = scheduledRunChannel.routes.find(
+      const route = companyRunChannel.routes.find(
         (candidate) =>
           candidate.transport !== "websocket" &&
           candidate.method === "POST" &&
           candidate.path === path
       );
       if (!route || route.transport === "websocket") {
-        throw new Error(`The scheduled run route ${path} is unavailable.`);
+        throw new Error(`The company run route ${path} is unavailable.`);
       }
 
       const response = await route.handler(
@@ -32,12 +33,6 @@ describe("scheduled run channel authentication", () => {
       expect(response.headers.get("www-authenticate")).toBe("Bearer");
     });
   }
-});
-
-describe("scheduled run channel boundary", () => {
-  it("does not expose an addressed cold-start receiver", () => {
-    expect(scheduledRunChannel.receive).toBeUndefined();
-  });
 });
 
 function unexpectedRouteContext() {

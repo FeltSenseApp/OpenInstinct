@@ -54,14 +54,14 @@ describe("scheduled run requests", () => {
     mocks.env.VERCEL_ENV = "preview";
     mocks.env.VERCEL_URL = "openinstinct-preview.vercel.app";
 
-    await postScheduledRunRoute("/internal/scheduled-run/report", {
+    await postScheduledRunRoute("/eve/v1/scheduled-run/report", {
       runId: "run-1",
     });
 
     expect(mocks.getToken).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledWith(
       new URL(
-        "https://openinstinct-preview.vercel.app/internal/scheduled-run/report"
+        "https://openinstinct-preview.vercel.app/eve/v1/scheduled-run/report"
       ),
       expect.objectContaining({
         body: JSON.stringify({ runId: "run-1" }),
@@ -77,7 +77,7 @@ describe("scheduled run requests", () => {
   });
 
   it("leaves local callbacks to Eve local development authentication", async () => {
-    await postScheduledRunRoute("/internal/scheduled-run/respond", {
+    await postScheduledRunRoute("/eve/v1/scheduled-run/respond", {
       answer: "Logan",
       leaseToken: "lease-1",
       runId: "run-1",
@@ -85,7 +85,7 @@ describe("scheduled run requests", () => {
 
     expect(mocks.getToken).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledWith(
-      new URL("http://127.0.0.1:51829/internal/scheduled-run/respond"),
+      new URL("http://127.0.0.1:51829/eve/v1/scheduled-run/respond"),
       expect.objectContaining({ method: "POST", redirect: "error" })
     );
     expect(sentHeaders().get("authorization")).toBeNull();
@@ -96,13 +96,13 @@ describe("scheduled run requests", () => {
   it("falls back to the application origin outside Next development", async () => {
     mocks.env.NODE_ENV = "test";
 
-    await postScheduledRunRoute("/internal/scheduled-run/report", {
+    await postScheduledRunRoute("/eve/v1/scheduled-run/report", {
       runId: "run-1",
     });
 
     expect(mocks.readFile).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledWith(
-      new URL("https://example.com/internal/scheduled-run/report"),
+      new URL("https://example.com/eve/v1/scheduled-run/report"),
       expect.objectContaining({ method: "POST", redirect: "error" })
     );
   });
@@ -115,12 +115,12 @@ describe("scheduled run requests", () => {
       })
     );
 
-    await postScheduledRunRoute("/internal/scheduled-run/report", {
+    await postScheduledRunRoute("/eve/v1/scheduled-run/report", {
       runId: "run-1",
     });
 
     expect(fetch).toHaveBeenCalledWith(
-      new URL("https://example.com/internal/scheduled-run/report"),
+      new URL("https://example.com/eve/v1/scheduled-run/report"),
       expect.objectContaining({ method: "POST", redirect: "error" })
     );
   });

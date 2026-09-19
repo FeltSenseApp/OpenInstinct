@@ -11,6 +11,7 @@ import type {
   releaseScheduledReport,
   setScheduledRunSession,
 } from "@db/services/scheduled-agent-jobs";
+import type { dispatchRootSession } from "@agent/lib/eve/dispatch-root-session";
 
 const services = vi.hoisted(() => ({
   claimReports: vi.fn<typeof claimScheduledReport>(),
@@ -24,6 +25,9 @@ const services = vi.hoisted(() => ({
 }));
 const requests = vi.hoisted(() => ({
   report: vi.fn<(runId: string) => Promise<void>>(),
+}));
+const rootDispatch = vi.hoisted(() => ({
+  dispatch: vi.fn<typeof dispatchRootSession>(),
 }));
 
 vi.mock("@db/services/scheduled-agent-jobs", () => ({
@@ -43,6 +47,10 @@ vi.mock("@agent/lib/schedules/request", () => ({
 vi.mock("@agent/channels/scheduled-run", () => ({
   default: { channel: "scheduled-run" },
 }));
+vi.mock("@agent/lib/eve/dispatch-root-session", () => ({
+  dispatchRootSession: rootDispatch.dispatch,
+  founderAgentId: "founder",
+}));
 
 import dynamicSchedule from "@agent/schedules/dynamic";
 import { dispatchScheduledReport } from "@agent/lib/schedules/report";
@@ -56,26 +64,29 @@ describe("dynamic schedule dispatch", () => {
     services.releaseRun.mockResolvedValue("queued");
     services.setSession.mockResolvedValue(true);
     requests.report.mockResolvedValue();
+    rootDispatch.dispatch.mockResolvedValue({ sessionId: "worker-session" });
   });
 
-  it("hands due work directly to the scheduled-run channel", async () => {
+  it("starts due work through the shared root-session dispatcher", async () => {
     const claim = scheduledClaim();
     services.claimRuns.mockResolvedValue([claim]);
-    const send = vi
-      .fn<ReturnType<ScheduleToFn>["send"]>()
-      .mockResolvedValue(workerSession());
-    const to = vi.fn<ScheduleToFn>(() => ({ send }));
+    const to = vi.fn<ScheduleToFn>();
 
     await runSchedule(to);
 
-    expect(to).toHaveBeenCalledWith(expect.anything(), {
-      restart: false,
-      runId: claim.run.id,
+    expect(rootDispatch.dispatch).toHaveBeenCalledOnce();
+    const dispatched = rootDispatch.dispatch.mock.calls[0]?.[0];
+    if (!dispatched) throw new Error("Expected a root-session dispatch.");
+    expect(dispatched.idempotencyKey).toBe(`scheduled-run:${claim.run.id}`);
+    expect(dispatched.principal.authenticator).toBe("scheduled-worker");
+    expect(dispatched.provenance).toMatchObject({
+      scheduledRunId: claim.run.id,
+      sourceType: "schedule-occurrence",
     });
-    expect(send.mock.calls[0]?.[0]).toContain("Task: Watch the price.");
-    expect(send.mock.calls[0]?.[1].auth?.authenticator).toBe(
-      "scheduled-worker"
-    );
+    expect(dispatched.targetAgentId).toBe("founder");
+    expect(dispatched.targetWorkspaceId).toBe(claim.job.workspaceId);
+    expect(dispatched.task).toContain("Task: Watch the price.");
+    expect(to).not.toHaveBeenCalled();
     expect(services.setSession).toHaveBeenCalledExactlyOnceWith(
       claim.run.id,
       claim.run.leaseToken,
@@ -86,21 +97,20 @@ describe("dynamic schedule dispatch", () => {
     );
   });
 
-  it("requests a clean restart for a reclaimed interrupted worker", async () => {
+  it("reuses a session already recorded on the occurrence", async () => {
     const claim = scheduledClaim();
     claim.run.workerSessionId = "interrupted-worker-session";
     services.claimRuns.mockResolvedValue([claim]);
-    const send = vi
-      .fn<ReturnType<ScheduleToFn>["send"]>()
-      .mockResolvedValue(workerSession());
-    const to = vi.fn<ScheduleToFn>(() => ({ send }));
+    const to = vi.fn<ScheduleToFn>();
 
     await runSchedule(to);
 
-    expect(to).toHaveBeenCalledWith(expect.anything(), {
-      restart: true,
-      runId: claim.run.id,
-    });
+    expect(rootDispatch.dispatch).not.toHaveBeenCalled();
+    expect(services.setSession).toHaveBeenCalledExactlyOnceWith(
+      claim.run.id,
+      claim.run.leaseToken,
+      "interrupted-worker-session"
+    );
   });
 
   it("delivers recoverable Linq reports through the schedule channel handle", async () => {
@@ -148,10 +158,10 @@ describe("dynamic schedule dispatch", () => {
         id: claim.run.id,
       },
     });
-    const send = vi
-      .fn<ReturnType<ScheduleToFn>["send"]>()
-      .mockRejectedValue(new Error("Workflow did not accept the candidate."));
-    const to = vi.fn<ScheduleToFn>(() => ({ send }));
+    rootDispatch.dispatch.mockRejectedValue(
+      new Error("Workflow did not accept the candidate.")
+    );
+    const to = vi.fn<ScheduleToFn>();
 
     await runSchedule(to);
 

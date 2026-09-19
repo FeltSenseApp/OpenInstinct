@@ -37,6 +37,7 @@ export default defineDynamic({
   events: {
     "turn.started": (_event, context) =>
       resolveModeValue(context, {
+        "company-report": { request_vault_setup: requestVaultSetup },
         interactive: {
           request_vault_import: requestVaultImport,
           request_vault_setup: requestVaultSetup,

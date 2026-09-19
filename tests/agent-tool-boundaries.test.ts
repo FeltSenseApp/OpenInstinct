@@ -23,6 +23,7 @@ describe("root and worker capability boundaries", () => {
     expect(toolFiles(rootTools)).toEqual([
       "ask_question.ts",
       "calendar.ts",
+      "company-dispatch.ts",
       "contacts.ts",
       "gmail.ts",
       "messaging.ts",
